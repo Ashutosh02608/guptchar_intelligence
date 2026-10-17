@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { X, ExternalLink, ShieldCheck, Hash, Calendar, FileText, CheckCircle2, Zap, Check } from "lucide-react";
+import { API_BASE } from "../utils/config";
 
 export function CircularDetailModal({ item, onClose, onNavigateToOutbox }) {
   const [isProcessing, setIsProcessing] = useState(false);
@@ -164,7 +165,7 @@ export function CircularDetailModal({ item, onClose, onNavigateToOutbox }) {
                 onClick={async () => {
                   setIsProcessing(true);
                   try {
-                    await fetch(`http://127.0.0.1:8000/api/intelligence/evaluate-announcement/${item.id}`, { method: "POST" });
+                    await fetch(`${API_BASE}/api/intelligence/evaluate-announcement/${item.id}`, { method: "POST" });
                     setNotice("AI Risk Evaluation launched! Extractor is finding companies and queuing Outbox emails.");
                     setTimeout(() => setNotice(""), 6000);
                   } catch (e) {

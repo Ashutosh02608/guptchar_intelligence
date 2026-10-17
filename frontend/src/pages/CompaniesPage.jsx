@@ -25,8 +25,9 @@ import {
   AlertTriangle,
   Award
 } from "lucide-react";
+import { API_BASE as DEFAULT_API_BASE } from "../utils/config";
 
-export function CompaniesPage({ API_BASE = "http://127.0.0.1:8000" }) {
+export function CompaniesPage({ API_BASE = DEFAULT_API_BASE }) {
   const [companies, setCompanies] = useState([]);
   const [loading, setLoading] = useState(true);
   const [filterSubscribed, setFilterSubscribed] = useState("ALL"); // "ALL", "SUBSCRIBED", "UNSUBSCRIBED"

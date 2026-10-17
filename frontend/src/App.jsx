@@ -13,9 +13,7 @@ import { AlertBanner } from "./components/AlertBanner";
 import { AlertCenterDrawer } from "./components/AlertCenterDrawer";
 import { LoginPage } from "./pages/LoginPage";
 import { sound } from "./utils/audio";
-
-const API_BASE = "http://127.0.0.1:8000";
-const WS_URL = "ws://127.0.0.1:8000/ws";
+import { API_BASE, WS_URL } from "./utils/config";
 
 export function App() {
   const [activeTab, setActiveTab] = useState("overview"); // overview, boards, updates, outbox, companies, telemetry, settings

@@ -1,12 +1,12 @@
 {
   "name": "guptchar-platform",
   "scripts": {
-    "start": "python run_app.py",
+    "start": "python backend/run.py",
+    "build": "npm --prefix frontend install && npm --prefix frontend run build",
     "dev:all": "python run_app.py",
+    "dev": "python run_app.py",
     "backend": "python backend/run.py",
-    "frontend": "npm --prefix frontend run dev",
-    "dev": "npm --prefix frontend run dev",
-    "build": "npm --prefix frontend run build"
+    "frontend": "npm --prefix frontend run dev"
   },
   "dependencies": {
     "@neon/config": "^1.9.2",

@@ -13,8 +13,7 @@ import {
   Key
 } from "lucide-react";
 import { sound } from "../utils/audio";
-
-const API_BASE = "http://127.0.0.1:8000";
+import { API_BASE } from "../utils/config";
 
 export function SettingsPage({ isMuted, onToggleMute, onResetFeed }) {
   const [resetSuccess, setResetSuccess] = useState(false);

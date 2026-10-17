@@ -1,9 +1,11 @@
 import asyncio
 import time
 import uuid
+from pathlib import Path
 from typing import List, Optional, Dict, Any
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException, Query, Header
 from fastapi.responses import FileResponse, HTMLResponse
+from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 
@@ -624,4 +626,26 @@ if EXTRACTOR_STATIC.exists():
         if index_file.exists():
             return FileResponse(str(index_file))
         return HTMLResponse("<h1>Extractor Engine Running</h1>")
+
+# --- PRODUCTION FRONTEND SPA ROUTING (Single Container / Unified Deployment) ---
+FRONTEND_DIST = Path(__file__).resolve().parent.parent / "frontend" / "dist"
+if FRONTEND_DIST.exists():
+    assets_dir = FRONTEND_DIST / "assets"
+    if assets_dir.exists():
+        app.mount("/assets", StaticFiles(directory=str(assets_dir)), name="frontend_assets")
+
+    @app.get("/{full_path:path}", response_class=HTMLResponse)
+    async def serve_frontend_spa(full_path: str):
+        # Do not intercept API, WebSocket, or Extractor routes
+        if full_path.startswith("api") or full_path == "ws" or full_path.startswith("extractor"):
+            raise HTTPException(status_code=404, detail="Resource Not Found")
+
+        target = FRONTEND_DIST / full_path
+        if target.is_file():
+            return FileResponse(str(target))
+
+        index_html = FRONTEND_DIST / "index.html"
+        if index_html.exists():
+            return FileResponse(str(index_html))
+        return HTMLResponse("<h1>Guptchar Surveillance Engine</h1>")
 

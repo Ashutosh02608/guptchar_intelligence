@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { Activity, RotateCw, CheckCircle2, AlertTriangle, XCircle, Clock, Server } from "lucide-react";
+import { API_BASE } from "../utils/config";
 
 export function TelemetryPage({ stats }) {
   const [logs, setLogs] = useState([]);
@@ -8,7 +9,7 @@ export function TelemetryPage({ stats }) {
   const fetchTelemetry = async () => {
     setIsLoading(true);
     try {
-      const res = await fetch("http://127.0.0.1:8000/api/telemetry?limit=80");
+      const res = await fetch(`${API_BASE}/api/telemetry?limit=80`);
       const data = await res.json();
       setLogs(data);
     } catch (e) {

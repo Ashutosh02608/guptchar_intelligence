@@ -12,8 +12,7 @@ import {
   ShieldAlert
 } from "lucide-react";
 import { sound } from "../utils/audio";
-
-const API_BASE = "http://127.0.0.1:8000";
+import { API_BASE } from "../utils/config";
 
 export function LoginPage({ onLoginSuccess }) {
   const [username, setUsername] = useState("");

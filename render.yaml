@@ -8,6 +8,8 @@ services:
     startCommand: "python backend/run.py"
     healthCheckPath: /api/health
     envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.9
       - key: HOST
         value: 0.0.0.0
       - key: ENVIRONMENT

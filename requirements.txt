@@ -9,6 +9,7 @@ websockets>=13.0
 
 # Database & Cloud Connectivity
 asyncpg>=0.30.0
+aiosqlite>=0.20.0
 python-dotenv>=1.0.0
 
 # Asynchronous HTTP Client & Network Scraping

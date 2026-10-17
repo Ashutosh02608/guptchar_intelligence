@@ -1,0 +1,707 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Guptchar Extractor Engine — Entity OSINT & Regulatory Intelligence</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg-dark: #07090e;
+      --card-bg: rgba(15, 23, 42, 0.65);
+      --card-border: rgba(255, 255, 255, 0.08);
+      --accent-cyan: #06b6d4;
+      --accent-emerald: #10b981;
+      --accent-blue: #3b82f6;
+      --text-main: #f8fafc;
+      --text-muted: #94a3b8;
+      --text-dim: #64748b;
+      --glow-cyan: rgba(6, 182, 212, 0.25);
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: radial-gradient(circle at 15% 15%, rgba(6, 182, 212, 0.07) 0%, transparent 40%),
+                  radial-gradient(circle at 85% 85%, rgba(16, 185, 129, 0.06) 0%, transparent 40%),
+                  var(--bg-dark);
+      color: var(--text-main);
+      font-family: 'Inter', -apple-system, sans-serif;
+      min-height: 100vh;
+      padding: 32px 20px 80px;
+    }
+
+    .container {
+      max-width: 1240px;
+      margin: 0 auto;
+    }
+
+    /* Header */
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 32px;
+      padding-bottom: 20px;
+      border-bottom: 1px solid var(--card-border);
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+    }
+
+    .logo-badge {
+      background: linear-gradient(135deg, var(--accent-cyan), var(--accent-emerald));
+      width: 42px;
+      height: 42px;
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 0 20px var(--glow-cyan);
+    }
+
+    .brand h1 {
+      font-size: 1.35rem;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+    }
+
+    .brand p {
+      font-size: 0.8rem;
+      color: var(--text-muted);
+    }
+
+    .radar-pill {
+      font-size: 0.72rem;
+      font-family: 'JetBrains Mono', monospace;
+      padding: 6px 12px;
+      border-radius: 20px;
+      background: rgba(16, 185, 129, 0.1);
+      border: 1px solid rgba(16, 185, 129, 0.3);
+      color: var(--accent-emerald);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .pulse-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: var(--accent-emerald);
+      box-shadow: 0 0 8px var(--accent-emerald);
+      animation: pulse 1.8s infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.4; transform: scale(0.85); }
+    }
+
+    /* Glassmorphic Query Box */
+    .glass-card {
+      background: var(--card-bg);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border: 1px solid var(--card-border);
+      border-radius: 16px;
+      padding: 24px;
+      margin-bottom: 28px;
+      box-shadow: 0 16px 36px rgba(0, 0, 0, 0.4);
+    }
+
+    .form-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+      gap: 16px;
+      margin-bottom: 20px;
+    }
+
+    .input-group {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .input-group label {
+      font-size: 0.76rem;
+      font-weight: 600;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+
+    .input-field {
+      background: rgba(2, 6, 23, 0.7);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 8px;
+      padding: 11px 14px;
+      color: var(--text-main);
+      font-size: 0.88rem;
+      outline: none;
+      transition: all 0.2s ease;
+    }
+
+    .input-field:focus {
+      border-color: var(--accent-cyan);
+      box-shadow: 0 0 12px var(--glow-cyan);
+    }
+
+    .options-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 16px;
+      padding-top: 14px;
+      border-top: 1px solid rgba(255, 255, 255, 0.05);
+    }
+
+    .checkbox-group {
+      display: flex;
+      gap: 20px;
+      align-items: center;
+    }
+
+    .custom-check {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 0.82rem;
+      color: var(--text-muted);
+      cursor: pointer;
+    }
+
+    .custom-check input {
+      accent-color: var(--accent-cyan);
+      cursor: pointer;
+    }
+
+    .btn-extract {
+      background: linear-gradient(135deg, #0284c7, #06b6d4);
+      color: #fff;
+      font-weight: 600;
+      font-size: 0.88rem;
+      padding: 12px 26px;
+      border-radius: 8px;
+      border: none;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      box-shadow: 0 4px 18px rgba(6, 182, 212, 0.3);
+      transition: all 0.2s ease;
+    }
+
+    .btn-extract:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 6px 24px rgba(6, 182, 212, 0.5);
+    }
+
+    .btn-extract:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+      transform: none;
+    }
+
+    /* Stage Tracker */
+    .stages-row {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 12px;
+      margin-bottom: 28px;
+    }
+
+    .stage-item {
+      background: rgba(15, 23, 42, 0.45);
+      border: 1px solid var(--card-border);
+      border-radius: 10px;
+      padding: 12px 14px;
+      position: relative;
+      transition: all 0.3s ease;
+    }
+
+    .stage-item.active {
+      border-color: var(--accent-cyan);
+      background: rgba(6, 182, 212, 0.08);
+      box-shadow: 0 0 16px var(--glow-cyan);
+    }
+
+    .stage-item.complete {
+      border-color: var(--accent-emerald);
+      background: rgba(16, 185, 129, 0.08);
+    }
+
+    .stage-num {
+      font-size: 0.68rem;
+      font-family: 'JetBrains Mono', monospace;
+      color: var(--text-dim);
+      margin-bottom: 4px;
+    }
+
+    .stage-title {
+      font-size: 0.82rem;
+      font-weight: 600;
+      color: var(--text-main);
+    }
+
+    .stage-desc {
+      font-size: 0.72rem;
+      color: var(--text-muted);
+      margin-top: 2px;
+    }
+
+    /* Progress Bar */
+    .progress-bar-container {
+      height: 4px;
+      background: rgba(255, 255, 255, 0.08);
+      border-radius: 2px;
+      overflow: hidden;
+      margin-bottom: 24px;
+      display: none;
+    }
+
+    .progress-bar-fill {
+      height: 100%;
+      width: 0%;
+      background: linear-gradient(90deg, var(--accent-cyan), var(--accent-emerald));
+      transition: width 0.4s ease;
+    }
+
+    /* Results View */
+    .results-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 18px;
+    }
+
+    .results-title {
+      font-size: 1.1rem;
+      font-weight: 600;
+    }
+
+    .export-btns {
+      display: flex;
+      gap: 10px;
+    }
+
+    .btn-export {
+      padding: 8px 16px;
+      border-radius: 6px;
+      font-size: 0.78rem;
+      font-weight: 600;
+      cursor: pointer;
+      text-decoration: none;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      border: 1px solid var(--card-border);
+      transition: all 0.2s ease;
+    }
+
+    .btn-pdf {
+      background: rgba(16, 185, 129, 0.15);
+      border-color: rgba(16, 185, 129, 0.4);
+      color: #34d399;
+    }
+
+    .btn-pdf:hover {
+      background: rgba(16, 185, 129, 0.25);
+    }
+
+    .btn-json {
+      background: rgba(6, 182, 212, 0.15);
+      border-color: rgba(6, 182, 212, 0.4);
+      color: #38bdf8;
+    }
+
+    .btn-json:hover {
+      background: rgba(6, 182, 212, 0.25);
+    }
+
+    /* Entity Cards */
+    .entity-card {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 14px;
+      padding: 20px;
+      margin-bottom: 16px;
+      backdrop-filter: blur(12px);
+      transition: border-color 0.2s;
+    }
+
+    .entity-card:hover {
+      border-color: rgba(255, 255, 255, 0.2);
+    }
+
+    .card-top {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: 12px;
+    }
+
+    .entity-name {
+      font-size: 1.08rem;
+      font-weight: 700;
+      color: #fff;
+    }
+
+    .prov-badge {
+      font-size: 0.68rem;
+      font-family: 'JetBrains Mono', monospace;
+      padding: 3px 8px;
+      border-radius: 6px;
+      font-weight: 600;
+    }
+
+    .badge-sec {
+      background: rgba(16, 185, 129, 0.15);
+      border: 1px solid rgba(16, 185, 129, 0.35);
+      color: #34d399;
+    }
+
+    .badge-web {
+      background: rgba(2, 132, 199, 0.15);
+      border: 1px solid rgba(2, 132, 199, 0.35);
+      color: #38bdf8;
+    }
+
+    .entity-summary {
+      font-size: 0.82rem;
+      color: var(--text-muted);
+      line-height: 1.45;
+      margin-bottom: 14px;
+    }
+
+    .meta-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 10px;
+      padding: 12px;
+      background: rgba(2, 6, 23, 0.5);
+      border-radius: 8px;
+      margin-bottom: 14px;
+      font-size: 0.78rem;
+    }
+
+    .meta-item span {
+      color: var(--text-dim);
+      display: block;
+      font-size: 0.7rem;
+      margin-bottom: 2px;
+    }
+
+    .meta-item a {
+      color: var(--accent-cyan);
+      text-decoration: none;
+    }
+
+    /* Executive Profiles Table */
+    .exec-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.78rem;
+      margin-top: 10px;
+      border-radius: 8px;
+      overflow: hidden;
+    }
+
+    .exec-table th {
+      background: rgba(30, 41, 59, 0.7);
+      color: var(--text-muted);
+      text-align: left;
+      padding: 8px 12px;
+      font-size: 0.7rem;
+      font-weight: 600;
+    }
+
+    .exec-table td {
+      padding: 8px 12px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+      color: var(--text-main);
+    }
+
+    .exec-table tr:hover td {
+      background: rgba(255, 255, 255, 0.02);
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <div class="brand">
+        <div class="logo-badge">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="11" cy="11" r="8"></circle>
+            <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+            <path d="M11 8v6"></path>
+            <path d="M8 11h6"></path>
+          </svg>
+        </div>
+        <div>
+          <h1>Guptchar Extractor Engine</h1>
+          <p>Autonomous Commercial OSINT & Financial Regulatory Intelligence</p>
+        </div>
+      </div>
+      <div class="radar-pill">
+        <span class="pulse-dot"></span>
+        <span>CDP STEALTH & SEC EDGAR ACTIVE</span>
+      </div>
+    </header>
+
+    <!-- Query Setup Box -->
+    <section class="glass-card">
+      <form id="extractForm">
+        <div class="form-grid">
+          <div class="input-group">
+            <label>Target Country</label>
+            <input type="text" id="country" class="input-field" value="United States" required>
+          </div>
+          <div class="input-group">
+            <label>Target City</label>
+            <input type="text" id="city" class="input-field" value="New York" required>
+          </div>
+          <div class="input-group">
+            <label>Industry / Sector / Keyword</label>
+            <input type="text" id="sector" class="input-field" value="Hedge Funds" required>
+          </div>
+          <div class="input-group">
+            <label>Result Limit</label>
+            <input type="number" id="limit" class="input-field" value="20" min="1" max="50">
+          </div>
+        </div>
+
+        <div class="options-row">
+          <div class="checkbox-group">
+            <label class="custom-check">
+              <input type="checkbox" id="checkSec" checked>
+              <span>SEC EDGAR Filings & C-Suite Look-up</span>
+            </label>
+            <label class="custom-check">
+              <input type="checkbox" id="exportPdf" checked>
+              <span>Generate Executive PDF Dossier</span>
+            </label>
+          </div>
+          <button type="submit" id="btnRun" class="btn-extract">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+              <polygon points="5 3 19 12 5 21 5 3"></polygon>
+            </svg>
+            <span>Initiate OSINT Extraction</span>
+          </button>
+        </div>
+      </form>
+    </section>
+
+    <!-- Stage Progress Tracker -->
+    <div class="stages-row">
+      <div class="stage-item" id="stageA">
+        <div class="stage-num">STAGE 01</div>
+        <div class="stage-title">Local Entity Discovery</div>
+        <div class="stage-desc">Google Maps CDP Scraper</div>
+      </div>
+      <div class="stage-item" id="stageB">
+        <div class="stage-num">STAGE 02</div>
+        <div class="stage-title">Deep Website Enrichment</div>
+        <div class="stage-desc">curl_cffi JA3 & Subpage Crawler</div>
+      </div>
+      <div class="stage-item" id="stageC">
+        <div class="stage-num">STAGE 03</div>
+        <div class="stage-title">SEC EDGAR Look-up</div>
+        <div class="stage-desc">Form D & ADV Related Persons</div>
+      </div>
+      <div class="stage-item" id="stageD">
+        <div class="stage-num">STAGE 04</div>
+        <div class="stage-title">Dossier Presentation</div>
+        <div class="stage-desc">ReportLab PDF & JSON Export</div>
+      </div>
+    </div>
+
+    <div class="progress-bar-container" id="progressBar">
+      <div class="progress-bar-fill" id="progressFill"></div>
+    </div>
+
+    <!-- Results Section -->
+    <section id="resultsSection" style="display: none;">
+      <div class="results-header">
+        <div class="results-title" id="resultsCount">Discovered Entities (0)</div>
+        <div class="export-btns">
+          <a href="#" id="dlPdf" class="btn-export btn-pdf" target="_blank" style="display: none;">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
+            Download PDF Dossier
+          </a>
+          <a href="#" id="dlJson" class="btn-export btn-json" target="_blank" style="display: none;">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="16 18 22 12 16 6"></polyline><polyline points="8 6 2 12 8 18"></polyline></svg>
+            Export Strict JSON
+          </a>
+        </div>
+      </div>
+
+      <div id="entitiesContainer"></div>
+    </section>
+  </div>
+
+  <script>
+    const form = document.getElementById("extractForm");
+    const btnRun = document.getElementById("btnRun");
+    const progressBar = document.getElementById("progressBar");
+    const progressFill = document.getElementById("progressFill");
+    const resultsSection = document.getElementById("resultsSection");
+    const entitiesContainer = document.getElementById("entitiesContainer");
+    const dlPdf = document.getElementById("dlPdf");
+    const dlJson = document.getElementById("dlJson");
+    const resultsCount = document.getElementById("resultsCount");
+
+    const stageA = document.getElementById("stageA");
+    const stageB = document.getElementById("stageB");
+    const stageC = document.getElementById("stageC");
+    const stageD = document.getElementById("stageD");
+
+    function setStage(stage) {
+      [stageA, stageB, stageC, stageD].forEach(s => s.classList.remove("active", "complete"));
+      if (stage >= 1) stageA.classList.add(stage > 1 ? "complete" : "active");
+      if (stage >= 2) stageB.classList.add(stage > 2 ? "complete" : "active");
+      if (stage >= 3) stageC.classList.add(stage > 3 ? "complete" : "active");
+      if (stage >= 4) stageD.classList.add(stage > 4 ? "complete" : "active");
+    }
+
+    form.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      btnRun.disabled = true;
+      btnRun.querySelector("span").textContent = "Extracting Intelligence...";
+      progressBar.style.display = "block";
+      progressFill.style.width = "15%";
+      resultsSection.style.display = "none";
+      entitiesContainer.innerHTML = "";
+      setStage(1);
+
+      const payload = {
+        country: document.getElementById("country").value,
+        city: document.getElementById("city").value,
+        sector: document.getElementById("sector").value,
+        limit: parseInt(document.getElementById("limit").value, 10),
+        check_sec: document.getElementById("checkSec").checked,
+        export_pdf: document.getElementById("exportPdf").checked,
+        export_json: true
+      };
+
+      // Progress animation steps
+      setTimeout(() => { setStage(2); progressFill.style.width = "45%"; }, 1200);
+      setTimeout(() => { setStage(3); progressFill.style.width = "75%"; }, 2800);
+
+      try {
+        const res = await fetch("/api/extract", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload)
+        });
+
+        const data = await res.json();
+        setStage(4);
+        progressFill.style.width = "100%";
+
+        setTimeout(() => {
+          renderResults(data);
+          btnRun.disabled = false;
+          btnRun.querySelector("span").textContent = "Initiate OSINT Extraction";
+        }, 500);
+
+      } catch (err) {
+        alert("Extraction request encountered an error: " + err);
+        btnRun.disabled = false;
+        btnRun.querySelector("span").textContent = "Initiate OSINT Extraction";
+      }
+    });
+
+    function renderResults(data) {
+      resultsSection.style.display = "block";
+      resultsCount.textContent = `Discovered Entities (${data.total_found} verified in ${data.execution_time_sec}s)`;
+
+      if (data.pdf_path) {
+        const filename = data.pdf_path.split(/[\/\\]/).pop();
+        dlPdf.href = `/api/dossier/pdf/${filename}`;
+        dlPdf.style.display = "inline-flex";
+      } else {
+        dlPdf.style.display = "none";
+      }
+
+      if (data.json_path) {
+        const filename = data.json_path.split(/[\/\\]/).pop();
+        dlJson.href = `/api/dossier/json/${filename}`;
+        dlJson.style.display = "inline-flex";
+      } else {
+        dlJson.style.display = "none";
+      }
+
+      entitiesContainer.innerHTML = data.entities.map((ent, idx) => {
+        const isSec = ent.data_provenance.includes("SEC");
+        const badgeClass = isSec ? "badge-sec" : "badge-web";
+
+        let execTableHtml = "";
+        if (ent.executives && ent.executives.length > 0) {
+          const rows = ent.executives.map(ex => `
+            <tr>
+              <td><strong>${ex.name}</strong></td>
+              <td>${ex.title}</td>
+              <td>${ex.email}</td>
+              <td><span class="prov-badge ${ex.provenance.includes('SEC') ? 'badge-sec' : 'badge-web'}">${ex.provenance}</span></td>
+            </tr>
+          `).join("");
+
+          execTableHtml = `
+            <table class="exec-table">
+              <thead>
+                <tr>
+                  <th>Executive Name</th>
+                  <th>Title / Designation</th>
+                  <th>Direct Contact</th>
+                  <th>Source</th>
+                </tr>
+              </thead>
+              <tbody>${rows}</tbody>
+            </table>
+          `;
+        }
+
+        return `
+          <div class="entity-card">
+            <div class="card-top">
+              <div>
+                <span style="color: var(--text-dim); font-size: 0.76rem; font-family: monospace;">#0${idx + 1}</span>
+                <span class="entity-name" style="margin-left: 8px;">${ent.name}</span>
+              </div>
+              <span class="prov-badge ${badgeClass}">${ent.data_provenance}</span>
+            </div>
+            <p class="entity-summary">${ent.company_summary}</p>
+            <div class="meta-grid">
+              <div class="meta-item">
+                <span>PHYSICAL ADDRESS</span>
+                <div>${ent.physical_address}</div>
+              </div>
+              <div class="meta-item">
+                <span>PRIMARY CORPORATE EMAIL</span>
+                <div style="color: var(--accent-cyan); font-weight: 600;">${ent.primary_email}</div>
+              </div>
+              <div class="meta-item">
+                <span>SWITCHBOARD PHONE</span>
+                <div>${ent.gatekeeper_phone}</div>
+              </div>
+              <div class="meta-item">
+                <span>OFFICIAL WEBSITE</span>
+                <div><a href="${ent.website_url}" target="_blank">${ent.website_url}</a></div>
+              </div>
+            </div>
+            ${execTableHtml}
+          </div>
+        `;
+      }).join("");
+    }
+  </script>
+</body>
+</html>

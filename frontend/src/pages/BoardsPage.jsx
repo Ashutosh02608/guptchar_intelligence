@@ -103,7 +103,7 @@ export function BoardsPage({ boards, onToggleBoard, onOpenAddBoard, onDeleteBoar
             />
           </div>
 
-          <div style={{ display: "flex", gap: "6px" }}>
+          <div className="scroll-touch-x" style={{ display: "flex", gap: "6px", flexWrap: "wrap" }}>
             {["ALL", "IN", "US", "UK", "EU"].map((jur) => (
               <button
                 key={jur}
@@ -116,7 +116,8 @@ export function BoardsPage({ boards, onToggleBoard, onOpenAddBoard, onDeleteBoar
                   border: jurisdictionFilter === jur ? "1px solid var(--neon-cyan)" : "1px solid rgba(255, 255, 255, 0.08)",
                   background: jurisdictionFilter === jur ? "rgba(6, 182, 212, 0.2)" : "rgba(255, 255, 255, 0.03)",
                   color: jurisdictionFilter === jur ? "var(--neon-cyan)" : "var(--text-muted)",
-                  cursor: "pointer"
+                  cursor: "pointer",
+                  whiteSpace: "nowrap"
                 }}
               >
                 {jur === "ALL" ? "ALL" : jur}
@@ -129,7 +130,7 @@ export function BoardsPage({ boards, onToggleBoard, onOpenAddBoard, onDeleteBoar
       {/* Boards Grid */}
       <div style={{ 
         display: "grid", 
-        gridTemplateColumns: "repeat(auto-fit, minmax(340px, 1fr))", 
+        gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 280px), 1fr))", 
         gap: "16px" 
       }}>
         {filtered.map((b) => {

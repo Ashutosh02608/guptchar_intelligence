@@ -76,7 +76,7 @@ export function TelemetryPage({ stats }) {
       </div>
 
       {/* Telemetry Summary Cards */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: "14px", marginBottom: "20px" }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 180px), 1fr))", gap: "14px", marginBottom: "20px" }}>
         <div className="glass-panel" style={{ padding: "16px" }}>
           <span style={{ fontSize: "0.72rem", color: "var(--text-muted)", fontWeight: "600" }}>TOTAL PROBE ITERATIONS</span>
           <div className="mono" style={{ fontSize: "1.4rem", fontWeight: "700", color: "var(--neon-cyan)", marginTop: "4px" }}>
@@ -111,8 +111,8 @@ export function TelemetryPage({ stats }) {
       </div>
 
       {/* Logs Table */}
-      <div className="glass-panel" style={{ padding: "20px", overflowX: "auto" }}>
-        <table style={{ width: "100%", borderCollapse: "collapse", textAlign: "left", fontSize: "0.82rem" }}>
+      <div className="glass-panel" style={{ padding: "16px", overflowX: "auto", WebkitOverflowScrolling: "touch" }}>
+        <table style={{ width: "100%", minWidth: "560px", borderCollapse: "collapse", textAlign: "left", fontSize: "0.82rem" }}>
           <thead>
             <tr style={{ borderBottom: "1px solid rgba(255, 255, 255, 0.1)", color: "var(--text-dim)", fontSize: "0.72rem", textTransform: "uppercase" }}>
               <th style={{ padding: "10px 14px" }}>TIMESTAMP</th>

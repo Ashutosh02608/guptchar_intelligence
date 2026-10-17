@@ -1,4 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
+import { Sidebar } from "./components/Sidebar";
+import { DashboardHeader } from "./components/DashboardHeader";
 import { Navigation } from "./components/Navigation";
 import { CommandCenterPage } from "./pages/CommandCenterPage";
 import { BoardsPage } from "./pages/BoardsPage";
@@ -45,6 +47,26 @@ export function App() {
       return null;
     }
   });
+
+  // Collapsible Sidebar State with LocalStorage Persistence
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(() => {
+    try {
+      return localStorage.getItem("guptchar_sidebar_collapsed") === "true";
+    } catch {
+      return false;
+    }
+  });
+  const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
+
+  const handleToggleSidebarCollapse = () => {
+    setIsSidebarCollapsed(prev => {
+      const next = !prev;
+      try {
+        localStorage.setItem("guptchar_sidebar_collapsed", String(next));
+      } catch {}
+      return next;
+    });
+  };
 
   const wsRef = useRef(null);
   const reconnectTimeoutRef = useRef(null);
@@ -373,21 +395,11 @@ export function App() {
   const criticalAlertsCount = alertsList.filter(a => a.severity === "CRITICAL" && !a.is_read).length;
 
   return (
-    <div style={{ maxWidth: "1480px", margin: "0 auto", padding: "16px 24px 60px" }}>
-      {/* Toast Alert Banner on Critical Incoming Circular */}
-      <AlertBanner 
-        alert={activeAlert} 
-        onDismiss={() => setActiveAlert(null)} 
-        onViewDetails={(item) => setSelectedItem(item)} 
-        onOpenAlertCenter={() => {
-          setActiveAlert(null);
-          setIsAlertCenterOpen(true);
-        }}
-        queueCount={unreadAlertsCount}
-      />
-
-      {/* Modern Multi-Page Navigation Header */}
-      <Navigation
+    <div className="dashboard-layout-wrapper">
+      {/* Collapsible Left Sidebar Flight Deck */}
+      <Sidebar
+        isCollapsed={isSidebarCollapsed}
+        onToggleCollapse={handleToggleSidebarCollapse}
         activeTab={activeTab}
         setActiveTab={setActiveTab}
         isSweeping={isSweeping}
@@ -404,10 +416,46 @@ export function App() {
         onOpenAlertCenter={() => setIsAlertCenterOpen(true)}
         currentUser={currentUser}
         onLogout={handleLogout}
+        wsConnected={wsConnected}
+        uptime={uptime}
+        isMobileOpen={isMobileSidebarOpen}
+        onCloseMobile={() => setIsMobileSidebarOpen(false)}
       />
 
-      {/* Active Page View */}
-      <main>
+      {/* Main Dashboard Canvas Pane */}
+      <div className="dashboard-main-content">
+        {/* Toast Alert Banner on Critical Incoming Circular */}
+        <AlertBanner 
+          alert={activeAlert} 
+          onDismiss={() => setActiveAlert(null)} 
+          onViewDetails={(item) => setSelectedItem(item)} 
+          onOpenAlertCenter={() => {
+            setActiveAlert(null);
+            setIsAlertCenterOpen(true);
+          }}
+          queueCount={unreadAlertsCount}
+        />
+
+        {/* Dashboard Topbar with Breadcrumb & Operational Triggers */}
+        <DashboardHeader
+          activeTab={activeTab}
+          isSidebarCollapsed={isSidebarCollapsed}
+          onToggleSidebarCollapse={handleToggleSidebarCollapse}
+          onOpenMobileSidebar={() => setIsMobileSidebarOpen(true)}
+          isSweeping={isSweeping}
+          onForceSweep={handleForceSweep}
+          onOpenAddBoard={() => setIsAddBoardOpen(true)}
+          isMuted={isMuted}
+          onToggleMute={handleToggleMute}
+          alertsCount={unreadAlertsCount}
+          criticalAlertsCount={criticalAlertsCount}
+          onOpenAlertCenter={() => setIsAlertCenterOpen(true)}
+          currentUser={currentUser}
+          wsConnected={wsConnected}
+        />
+
+        {/* Active Page View */}
+        <main style={{ flex: 1 }}>
         {activeTab === "overview" && (
           <CommandCenterPage
             stats={stats}
@@ -513,22 +561,14 @@ export function App() {
       />
 
       {/* Status Bar Footer */}
-      <footer style={{ 
-        marginTop: "40px", 
-        display: "flex", 
-        justifyContent: "space-between", 
-        alignItems: "center", 
-        fontSize: "0.74rem", 
-        color: "var(--text-dim)",
-        borderTop: "1px solid rgba(255, 255, 255, 0.05)",
-        paddingTop: "16px"
-      }}>
-        <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+      <footer className="app-footer">
+        <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
           <span style={{ 
             width: "6px", 
             height: "6px", 
             borderRadius: "50%", 
-            background: wsConnected ? "var(--neon-emerald)" : "var(--neon-amber)" 
+            background: wsConnected ? "var(--neon-emerald)" : "var(--neon-amber)",
+            flexShrink: 0
           }} />
           <span>
             {wsConnected ? "WebSocket Stream Connected" : "Connecting to Guptchar Engine..."}
@@ -537,12 +577,120 @@ export function App() {
           <span>Guptchar Surveillance v1.2</span>
         </div>
 
-        <div>
+        <div style={{ display: "flex", alignItems: "center", gap: "6px", flexWrap: "wrap" }}>
           <span>24*7 Autonomous Surveillance Active</span>
-          <span style={{ margin: "0 8px" }}>•</span>
+          <span>•</span>
           <span>Continuous Regulatory Engine</span>
         </div>
       </footer>
+      </div>
+
+      {/* Global Modals */}
+      <AddBoardModal
+        isOpen={isAddBoardOpen}
+        onClose={() => setIsAddBoardOpen(false)}
+        onAddBoard={handleAddBoard}
+      />
+
+      <CircularDetailModal
+        item={selectedItem}
+        onClose={() => setSelectedItem(null)}
+      />
+
+      {/* Surveillance Alert Center Slide-Over Drawer */}
+      <AlertCenterDrawer
+        isOpen={isAlertCenterOpen}
+        onClose={() => setIsAlertCenterOpen(false)}
+        alerts={alertsList}
+        onSelectAlert={(item) => {
+          setSelectedItem(item);
+          handleMarkRead(item.id);
+        }}
+        onDismissAlert={(alertId) => {
+          setAlertsList(prev => prev.filter(a => a.id !== alertId));
+        }}
+        onAcknowledgeAll={() => {
+          setAlertsList(prev => prev.map(a => ({ ...a, is_read: true })));
+          handleMarkAllRead();
+        }}
+        onClearAll={() => {
+          setAlertsList([]);
+        }}
+        isMuted={isMuted}
+        onToggleMute={handleToggleMute}
+      />
+
+      {/* Mobile Floating Bottom Bar for Quick 1-Tap Switching */}
+      <div 
+        className="hide-desktop"
+        style={{
+          position: "fixed",
+          bottom: 0,
+          left: 0,
+          right: 0,
+          background: "rgba(10, 15, 29, 0.94)",
+          backdropFilter: "blur(16px)",
+          WebkitBackdropFilter: "blur(16px)",
+          borderTop: "1px solid rgba(255, 255, 255, 0.1)",
+          padding: "6px 10px calc(env(safe-area-inset-bottom, 8px) + 4px)",
+          zIndex: 90,
+          display: "flex",
+          justifyContent: "space-around",
+          alignItems: "center",
+          boxShadow: "0 -4px 20px rgba(0, 0, 0, 0.5)"
+        }}
+      >
+        {[
+          { id: "overview", label: "Radar", icon: "📡" },
+          { id: "boards", label: "Boards", icon: "🌐", badge: boards.length },
+          { id: "updates", label: "Updates", icon: "📄", badge: updates.filter(u => !u.is_read).length },
+          { id: "outbox", label: "Outbox", icon: "✉️", badge: outbox.filter(d => d.status === "PENDING_REVIEW").length },
+          { id: "companies", label: "CRM", icon: "🏢", badge: companiesCount }
+        ].map(tab => {
+          const isActive = activeTab === tab.id;
+          return (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id)}
+              style={{
+                background: isActive ? "rgba(16, 185, 129, 0.18)" : "transparent",
+                border: isActive ? "1px solid rgba(16, 185, 129, 0.4)" : "1px solid transparent",
+                borderRadius: "8px",
+                padding: "4px 8px",
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "center",
+                gap: "2px",
+                color: isActive ? "#ffffff" : "var(--text-dim)",
+                fontSize: "0.68rem",
+                fontWeight: isActive ? "700" : "500",
+                cursor: "pointer",
+                position: "relative",
+                minWidth: "54px"
+              }}
+            >
+              <span style={{ fontSize: "1rem", lineHeight: 1 }}>{tab.icon}</span>
+              <span>{tab.label}</span>
+              {tab.badge > 0 && (
+                <span style={{
+                  position: "absolute",
+                  top: "-2px",
+                  right: "6px",
+                  background: tab.id === "outbox" ? "var(--neon-amber)" : "var(--neon-emerald)",
+                  color: "#ffffff",
+                  fontSize: "0.55rem",
+                  fontWeight: "800",
+                  padding: "0 4px",
+                  borderRadius: "8px",
+                  lineHeight: "13px"
+                }}>
+                  {tab.badge > 99 ? "99+" : tab.badge}
+                </span>
+              )}
+            </button>
+          );
+        })}
+      </div>
     </div>
   );
 }

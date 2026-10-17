@@ -88,12 +88,12 @@ export function DispatchReviewModal({
       alignItems: "center",
       justifyContent: "center",
       zIndex: 9999,
-      padding: "20px"
+      padding: "10px"
     }}>
       <div className="glass-panel" style={{
         width: "100%",
         maxWidth: "1020px",
-        maxHeight: "92vh",
+        maxHeight: "94vh",
         display: "flex",
         flexDirection: "column",
         borderRadius: "16px",
@@ -104,24 +104,26 @@ export function DispatchReviewModal({
       }}>
         {/* Modal Header */}
         <div style={{
-          padding: "18px 24px",
+          padding: "16px 20px",
           borderBottom: "1px solid rgba(255, 255, 255, 0.08)",
           display: "flex",
           justifyContent: "space-between",
-          alignItems: "center"
+          alignItems: "flex-start",
+          gap: "10px"
         }}>
-          <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+          <div style={{ display: "flex", alignItems: "flex-start", gap: "12px", flex: 1 }}>
             <div style={{
-              width: "38px", height: "38px", borderRadius: "10px",
+              width: "36px", height: "36px", borderRadius: "10px",
               background: "rgba(6, 182, 212, 0.15)",
               border: "1px solid rgba(6, 182, 212, 0.4)",
-              display: "flex", alignItems: "center", justifyContent: "center"
+              display: "flex", alignItems: "center", justifyContent: "center",
+              flexShrink: 0
             }}>
-              <Mail style={{ color: "var(--neon-cyan)", width: "20px", height: "20px" }} />
+              <Mail style={{ color: "var(--neon-cyan)", width: "18px", height: "18px" }} />
             </div>
             <div>
-              <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                <h3 style={{ fontSize: "1.1rem", fontWeight: "700", color: "#fff", margin: 0 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: "6px", flexWrap: "wrap" }}>
+                <h3 style={{ fontSize: "1.05rem", fontWeight: "700", color: "#fff", margin: 0 }}>
                   Human Review: {dispatch.company_name}
                 </h3>
                 <span className={`badge badge-${dispatch.severity.toLowerCase()}`}>
@@ -139,7 +141,7 @@ export function DispatchReviewModal({
                     background: "rgba(16, 185, 129, 0.18)",
                     color: "#10b981",
                     border: "1px solid rgba(16, 185, 129, 0.4)",
-                    fontSize: "0.72rem",
+                    fontSize: "0.68rem",
                     fontWeight: "600"
                   }}>
                     👑 VIP SUBSCRIBER
@@ -149,14 +151,14 @@ export function DispatchReviewModal({
                     background: "rgba(168, 85, 247, 0.18)",
                     color: "#c084fc",
                     border: "1px solid rgba(168, 85, 247, 0.4)",
-                    fontSize: "0.72rem",
+                    fontSize: "0.68rem",
                     fontWeight: "600"
                   }}>
                     ⚡ PROSPECT EARLY-WARNING
                   </span>
                 )}
               </div>
-              <p style={{ fontSize: "0.76rem", color: "var(--text-muted)", margin: "2px 0 0" }}>
+              <p style={{ fontSize: "0.74rem", color: "var(--text-muted)", margin: "3px 0 0" }}>
                 Sector: {dispatch.sector} • Hub: {dispatch.region} • Template: {dispatch.is_subscribed || dispatch.template_type === "SUBSCRIBED_VIP" ? "Subscriber Confidential Advisory" : "Unsubscribed Conversion Dispatch"}
               </p>
             </div>
@@ -166,22 +168,22 @@ export function DispatchReviewModal({
             onClick={onClose}
             style={{
               background: "transparent", border: "none", color: "var(--text-dim)",
-              cursor: "pointer", padding: "6px"
+              cursor: "pointer", padding: "4px"
             }}
           >
             <X size={20} />
           </button>
         </div>
 
-        {/* Modal Body - 2 Columns */}
-        <div style={{
-          display: "grid",
-          gridTemplateColumns: "1.1fr 1.3fr",
-          gap: "20px",
-          padding: "20px 24px",
-          overflowY: "auto",
-          flex: 1
-        }}>
+        {/* Modal Body - Responsive Split Grid */}
+        <div 
+          className="modal-split-layout"
+          style={{
+            padding: "16px 20px",
+            overflowY: "auto",
+            flex: 1
+          }}
+        >
           {/* Left Column: Context & Intelligence */}
           <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
             {/* Regulatory Trigger Card */}
@@ -434,12 +436,14 @@ export function DispatchReviewModal({
 
         {/* Modal Footer Controls */}
         <div style={{
-          padding: "16px 24px",
+          padding: "14px 20px",
           borderTop: "1px solid rgba(255, 255, 255, 0.08)",
           background: "rgba(0, 0, 0, 0.35)",
           display: "flex",
           justifyContent: "space-between",
-          alignItems: "center"
+          alignItems: "center",
+          flexWrap: "wrap",
+          gap: "10px"
         }}>
           <div style={{ display: "flex", gap: "10px" }}>
             <button

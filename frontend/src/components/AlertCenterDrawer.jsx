@@ -117,7 +117,7 @@ export function AlertCenterDrawer({
       }}
     >
       <div 
-        className="drawer-enter"
+        className="drawer-enter alert-drawer-sheet"
         onClick={(e) => e.stopPropagation()}
         style={{
           width: "100%",

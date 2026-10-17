@@ -94,7 +94,7 @@ export function AlertBanner({
 
   return (
     <div 
-      className={`alert-toast-enter ${isCritical ? "alert-glow-critical" : ""}`}
+      className={`alert-toast-container alert-toast-enter ${isCritical ? "alert-glow-critical" : ""}`}
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
       style={{

@@ -108,7 +108,8 @@ export function OutboxPage({
                 }}
               >
                 <CheckCheck size={16} />
-                <span>Approve & Send All Pending ({pendingCount})</span>
+                <span className="hide-mobile">Approve & Send All Pending ({pendingCount})</span>
+                <span className="show-mobile hide-desktop">Approve All ({pendingCount})</span>
               </button>
             )}
 
@@ -138,7 +139,7 @@ export function OutboxPage({
         {/* Stats Metrics Cards */}
         <div style={{
           display: "grid",
-          gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
+          gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 160px), 1fr))",
           gap: "14px"
         }}>
           <div style={{
@@ -257,7 +258,7 @@ export function OutboxPage({
           gap: "14px"
         }}>
           {/* Status Tabs */}
-          <div style={{ display: "flex", gap: "6px" }}>
+          <div className="scroll-touch-x" style={{ display: "flex", gap: "6px", flexWrap: "wrap" }}>
             {[
               { id: "PENDING_REVIEW", label: `Pending Review (${pendingCount})` },
               { id: "SENT", label: `Dispatched (${sentCount})` },
@@ -275,7 +276,8 @@ export function OutboxPage({
                   borderRadius: "6px",
                   fontSize: "0.76rem",
                   fontWeight: statusFilter === tab.id ? "600" : "500",
-                  cursor: "pointer"
+                  cursor: "pointer",
+                  whiteSpace: "nowrap"
                 }}
               >
                 {tab.label}
@@ -292,9 +294,11 @@ export function OutboxPage({
               background: "rgba(0, 0, 0, 0.4)",
               border: "1px solid rgba(255, 255, 255, 0.08)",
               borderRadius: "6px",
-              padding: "6px 12px"
+              padding: "6px 12px",
+              flex: "1 1 180px",
+              minWidth: "min(100%, 180px)"
             }}>
-              <Search size={14} style={{ color: "var(--text-dim)" }} />
+              <Search size={14} style={{ color: "var(--text-dim)", flexShrink: 0 }} />
               <input
                 type="text"
                 placeholder="Search company, sector, circular..."
@@ -306,7 +310,7 @@ export function OutboxPage({
                   outline: "none",
                   color: "#fff",
                   fontSize: "0.78rem",
-                  width: "200px"
+                  width: "100%"
                 }}
               />
             </div>

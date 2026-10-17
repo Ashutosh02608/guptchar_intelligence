@@ -356,3 +356,360 @@ h1, h2, h3, h4, h5, h6 {
 .alert-glow-critical {
   animation: alertPulseGlow 2s infinite ease-in-out;
 }
+
+/* ==========================================================================
+   RESPONSIVE DESIGN SYSTEM & MOBILE FIRST ADAPTATIONS
+   ========================================================================== */
+
+/* Main App Container */
+.app-layout-container {
+  max-width: 1480px;
+  margin: 0 auto;
+  padding: 16px 24px 60px;
+  width: 100%;
+}
+
+/* Horizontal Touch-Scroll Container for Filters / Badges / Tabs */
+.scroll-touch-x {
+  display: flex;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none; /* IE/Edge */
+}
+.scroll-touch-x::-webkit-scrollbar {
+  display: none; /* Chrome/Safari */
+}
+
+/* Glass input reusable utility */
+.glass-input {
+  background: rgba(0, 0, 0, 0.35);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: var(--radius-sm);
+  color: #ffffff;
+  outline: none;
+  font-family: var(--font-body);
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+.glass-input:focus {
+  border-color: var(--neon-cyan);
+  box-shadow: 0 0 10px rgba(6, 182, 212, 0.25);
+}
+
+/* Modal Split Layout: 2 columns on desktop, 1 column on tablet & mobile */
+.modal-split-layout {
+  display: grid;
+  grid-template-columns: 1.1fr 1.3fr;
+  gap: 20px;
+}
+
+/* Responsive Footer */
+.app-footer {
+  margin-top: 40px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.74rem;
+  color: var(--text-dim);
+  border-top: 1px solid rgba(255, 255, 255, 0.05);
+  padding-top: 16px;
+  gap: 12px;
+}
+
+/* Navigation specific responsive styles */
+.nav-header-bar {
+  padding: 14px 20px;
+  margin-bottom: 22px;
+}
+
+.nav-desktop-tabs {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  background: rgba(0, 0, 0, 0.35);
+  padding: 4px;
+  border-radius: var(--radius-full);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.nav-mobile-toggle-btn {
+  display: none;
+}
+
+.nav-mobile-drawer {
+  display: none;
+}
+
+/* Utility visibility classes */
+.hide-desktop {
+  display: none !important;
+}
+.show-desktop {
+  display: inherit !important;
+}
+
+/* --------------------------------------------------------------------------
+   TABLET BREAKPOINT: <= 1024px
+   -------------------------------------------------------------------------- */
+@media (max-width: 1024px) {
+  .app-layout-container {
+    padding: 14px 18px 48px;
+  }
+
+  /* Nav tabs become scrollable or compact */
+  .nav-desktop-tabs {
+    order: 3;
+    width: 100%;
+    margin-top: 10px;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    white-space: nowrap;
+    scrollbar-width: none;
+    padding: 6px;
+    border-radius: var(--radius-lg);
+  }
+  .nav-desktop-tabs::-webkit-scrollbar {
+    display: none;
+  }
+
+  .modal-split-layout {
+    grid-template-columns: 1fr;
+    gap: 16px;
+  }
+}
+
+/* --------------------------------------------------------------------------
+   MOBILE BREAKPOINT: <= 768px
+   -------------------------------------------------------------------------- */
+@media (max-width: 768px) {
+  :root {
+    --radius-lg: 12px;
+    --radius-md: 8px;
+  }
+
+  .app-layout-container {
+    padding: 10px 12px 40px;
+  }
+
+  .hide-mobile {
+    display: none !important;
+  }
+  .show-mobile {
+    display: inherit !important;
+  }
+  .hide-desktop {
+    display: inherit !important;
+  }
+  .show-desktop {
+    display: none !important;
+  }
+
+  /* Typography adaptations */
+  h1 {
+    font-size: 1.35rem !important;
+  }
+  h2 {
+    font-size: 1.1rem !important;
+  }
+  h3 {
+    font-size: 0.98rem !important;
+  }
+
+  /* Modals on mobile */
+  .modal-overlay {
+    padding: 8px;
+    align-items: flex-end; /* Mobile bottom sheet style or centered fit */
+  }
+
+  .modal-content {
+    max-height: 92vh;
+    border-radius: 14px 14px 10px 10px;
+    padding: 0;
+  }
+
+  /* Alert Banner on mobile */
+  .alert-toast-container {
+    top: 10px !important;
+    left: 10px !important;
+    right: 10px !important;
+    width: calc(100% - 20px) !important;
+    max-width: 100% !important;
+  }
+
+  /* Alert Center Drawer on mobile */
+  .alert-drawer-sheet {
+    max-width: 100% !important;
+    width: 100% !important;
+  }
+
+  /* App Footer on mobile */
+  .app-footer {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+    font-size: 0.7rem;
+  }
+
+  /* Glass Panel mobile padding */
+  .glass-panel {
+    border-radius: var(--radius-md);
+  }
+
+  /* Buttons on mobile - easier touch targets */
+  .btn {
+    padding: 7px 12px;
+    font-size: 0.8rem;
+  }
+
+  /* Nav header */
+  .nav-header-bar {
+    padding: 10px 14px;
+    margin-bottom: 14px;
+  }
+
+  .nav-mobile-toggle-btn {
+    display: inline-flex;
+  }
+}
+
+/* --------------------------------------------------------------------------
+   SMALL MOBILE BREAKPOINT: <= 480px
+   -------------------------------------------------------------------------- */
+@media (max-width: 480px) {
+  .app-layout-container {
+    padding: 8px 8px 36px;
+  }
+
+  .btn {
+    font-size: 0.75rem;
+    padding: 6px 10px;
+  }
+
+  .badge {
+    font-size: 0.65rem;
+    padding: 2px 6px;
+  }
+}
+
+/* ==========================================================================
+   COLLAPSIBLE SIDEBAR & DASHBOARD SHELL LAYOUT
+   ========================================================================== */
+
+.dashboard-layout-wrapper {
+  display: flex;
+  min-height: 100vh;
+  width: 100%;
+  position: relative;
+  background-color: var(--bg-dark);
+}
+
+.dashboard-main-content {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  padding: 16px 24px 60px;
+  max-width: 1680px;
+  margin: 0 auto;
+  width: 100%;
+}
+
+/* Sidebar & Command Center Scrollbar */
+.dashboard-sidebar nav,
+.dashboard-sidebar,
+.sidebar-scroll-area,
+.command-center-scroll-body {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.15) transparent;
+}
+.dashboard-sidebar::-webkit-scrollbar,
+.sidebar-scroll-area::-webkit-scrollbar,
+.command-center-scroll-body::-webkit-scrollbar {
+  width: 4px;
+}
+.dashboard-sidebar::-webkit-scrollbar-track,
+.sidebar-scroll-area::-webkit-scrollbar-track,
+.command-center-scroll-body::-webkit-scrollbar-track {
+  background: transparent;
+}
+.dashboard-sidebar::-webkit-scrollbar-button,
+.sidebar-scroll-area::-webkit-scrollbar-button,
+.command-center-scroll-body::-webkit-scrollbar-button {
+  display: none !important;
+  width: 0 !important;
+  height: 0 !important;
+}
+.dashboard-sidebar::-webkit-scrollbar-thumb,
+.sidebar-scroll-area::-webkit-scrollbar-thumb,
+.command-center-scroll-body::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.15);
+  border-radius: 4px;
+}
+.dashboard-sidebar::-webkit-scrollbar-thumb:hover,
+.sidebar-scroll-area::-webkit-scrollbar-thumb:hover,
+.command-center-scroll-body::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.28);
+}
+
+/* Mobile & Tablet Off-Canvas Drawer */
+@media (max-width: 1024px) {
+  .dashboard-sidebar {
+    position: fixed !important;
+    top: 0 !important;
+    bottom: 0 !important;
+    left: 0 !important;
+    height: 100vh !important;
+    width: 280px !important;
+    min-width: 280px !important;
+    transform: translateX(-100%);
+    box-shadow: 10px 0 40px rgba(0, 0, 0, 0.8) !important;
+    z-index: 1000 !important;
+  }
+
+  .dashboard-sidebar.mobile-open {
+    transform: translateX(0) !important;
+  }
+
+  .dashboard-main-content {
+    padding: 12px 14px 64px;
+  }
+}
+
+/* Command Center 3:7 Split Grid (Left: Boards, Right: Live Circulars) */
+.command-center-split {
+  display: grid;
+  grid-template-columns: 3fr 7fr;
+  gap: 20px;
+  align-items: stretch;
+}
+
+@media (min-width: 1025px) {
+  .command-center-split {
+    min-height: auto;
+  }
+  .command-center-col {
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+  }
+  .command-center-scroll-body {
+    flex: 1;
+    overflow-y: auto;
+    max-height: 560px;
+    padding-right: 2px;
+  }
+}
+
+@media (max-width: 1024px) {
+  .command-center-split {
+    grid-template-columns: 1fr;
+    gap: 24px;
+    min-height: auto;
+  }
+  .command-center-scroll-body {
+    max-height: none;
+    overflow-y: visible;
+  }
+}
+
+

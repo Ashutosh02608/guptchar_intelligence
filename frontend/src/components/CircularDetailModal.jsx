@@ -1,6 +1,7 @@
 import React, { useState } from "react";
-import { X, ExternalLink, ShieldCheck, Hash, Calendar, FileText, CheckCircle2, Zap, Check } from "lucide-react";
+import { X, ExternalLink, ShieldCheck, Hash, Calendar, FileText, CheckCircle2, Zap, Check, Timer } from "lucide-react";
 import { API_BASE } from "../utils/config";
+import { calculateDeadlineInfo } from "../utils/deadlineTracker";
 
 export function CircularDetailModal({ item, onClose, onNavigateToOutbox }) {
   const [isProcessing, setIsProcessing] = useState(false);
@@ -10,6 +11,7 @@ export function CircularDetailModal({ item, onClose, onNavigateToOutbox }) {
 
   const isCritical = item.severity === "CRITICAL";
   const isHigh = item.severity === "HIGH";
+  const deadlineInfo = calculateDeadlineInfo(item);
 
   return (
     <div className="modal-overlay" onClick={onClose}>
@@ -72,6 +74,105 @@ export function CircularDetailModal({ item, onClose, onNavigateToOutbox }) {
             </div>
           </div>
 
+          {/* Compliance Deadline & Enforcement Radar */}
+          {deadlineInfo && (
+            <div>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px" }}>
+                <h4 style={{ fontSize: "0.8rem", color: "var(--text-dim)", textTransform: "uppercase", letterSpacing: "0.05em", margin: 0, display: "flex", alignItems: "center", gap: "6px" }}>
+                  <Timer size={14} color="var(--neon-cyan)" />
+                  <span>Compliance Deadline Radar</span>
+                </h4>
+                <span 
+                  style={{
+                    fontSize: "0.74rem",
+                    fontWeight: "700",
+                    color: deadlineInfo.tierColor,
+                    background: deadlineInfo.urgencyTier === "IMMEDIATE" || deadlineInfo.isOverdue
+                      ? "rgba(239, 68, 68, 0.2)"
+                      : deadlineInfo.urgencyTier === "APPROACHING"
+                      ? "rgba(245, 158, 11, 0.16)"
+                      : "rgba(16, 185, 129, 0.14)",
+                    padding: "3px 8px",
+                    borderRadius: "4px",
+                    border: `1px solid ${deadlineInfo.tierColor}55`
+                  }}
+                >
+                  {deadlineInfo.urgencyLabel}
+                </span>
+              </div>
+
+              <div style={{
+                background: "linear-gradient(135deg, rgba(15, 23, 42, 0.85) 0%, rgba(11, 17, 30, 0.95) 100%)",
+                border: `1px solid ${deadlineInfo.urgencyTier === "IMMEDIATE" || deadlineInfo.isOverdue ? "rgba(239, 68, 68, 0.45)" : "rgba(6, 182, 212, 0.25)"}`,
+                borderRadius: "var(--radius-md)",
+                padding: "16px 18px",
+                display: "flex",
+                flexDirection: "column",
+                gap: "12px",
+                boxShadow: deadlineInfo.urgencyTier === "IMMEDIATE" || deadlineInfo.isOverdue ? "0 0 18px rgba(239, 68, 68, 0.15)" : "none"
+              }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "12px" }}>
+                  <div>
+                    <div style={{ fontSize: "0.72rem", color: "var(--text-dim)", textTransform: "uppercase", letterSpacing: "0.04em" }}>
+                      Target Enforcement Date
+                    </div>
+                    <div style={{ fontSize: "1.1rem", fontWeight: "700", color: "#ffffff", marginTop: "2px", display: "flex", alignItems: "center", gap: "6px" }}>
+                      <Calendar size={16} color="var(--neon-cyan)" />
+                      <span>{deadlineInfo.formattedDate}</span>
+                    </div>
+                    <div style={{ fontSize: "0.75rem", color: "var(--neon-cyan)", marginTop: "2px", fontWeight: "500" }}>
+                      {deadlineInfo.stageTitle}
+                    </div>
+                  </div>
+
+                  <div style={{ textAlign: "right" }}>
+                    <div style={{ fontSize: "0.72rem", color: "var(--text-dim)", textTransform: "uppercase", letterSpacing: "0.04em" }}>
+                      Compliance Countdown
+                    </div>
+                    <div style={{
+                      fontSize: "1.2rem",
+                      fontWeight: "800",
+                      fontFamily: "var(--font-mono)",
+                      color: deadlineInfo.tierColor,
+                      marginTop: "2px",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "flex-end",
+                      gap: "6px"
+                    }}>
+                      <Timer size={18} />
+                      <span>{deadlineInfo.countdownText}</span>
+                    </div>
+                    <div style={{ fontSize: "0.72rem", color: "var(--text-muted)", marginTop: "2px" }}>
+                      {deadlineInfo.isOverdue ? "Mandatory cutoff elapsed" : "Grace window active"}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Transition Window Progress Bar */}
+                <div>
+                  <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.7rem", color: "var(--text-dim)", marginBottom: "4px" }}>
+                    <span>Announcement Detected</span>
+                    <span>Transition Window: {deadlineInfo.progressPercent}% elapsed</span>
+                    <span>Enforcement Cutoff</span>
+                  </div>
+                  <div style={{ width: "100%", height: "6px", background: "rgba(255, 255, 255, 0.08)", borderRadius: "3px", overflow: "hidden" }}>
+                    <div 
+                      style={{ 
+                        width: `${deadlineInfo.progressPercent || 0}%`, 
+                        height: "100%", 
+                        background: deadlineInfo.urgencyTier === "IMMEDIATE" || deadlineInfo.isOverdue
+                          ? "linear-gradient(90deg, #f59e0b 0%, #ef4444 100%)"
+                          : "linear-gradient(90deg, var(--neon-cyan) 0%, var(--neon-emerald) 100%)",
+                        transition: "width 0.4s ease"
+                      }} 
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Official Document Link & Authority Verification */}
           <div>
             <h4 style={{ fontSize: "0.8rem", color: "var(--text-dim)", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: "6px" }}>
@@ -85,6 +186,7 @@ export function CircularDetailModal({ item, onClose, onNavigateToOutbox }) {
               display: "flex",
               alignItems: "center",
               justifyContent: "space-between",
+              flexWrap: "wrap",
               gap: "10px"
             }}>
               <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
@@ -109,7 +211,7 @@ export function CircularDetailModal({ item, onClose, onNavigateToOutbox }) {
           {/* Audit Verification */}
           <div style={{ 
             display: "grid", 
-            gridTemplateColumns: "1fr 1fr", 
+            gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 140px), 1fr))", 
             gap: "10px", 
             fontSize: "0.74rem", 
             color: "var(--text-muted)",

@@ -103,7 +103,7 @@ export function LoginPage({ onLoginSuccess }) {
       <div className="glass-panel" style={{
         width: "100%",
         maxWidth: "460px",
-        padding: "40px 36px",
+        padding: "clamp(24px, 5vw, 40px) clamp(18px, 5vw, 36px)",
         borderRadius: "16px",
         position: "relative",
         boxShadow: "0 25px 60px -15px rgba(0, 0, 0, 0.7), 0 0 30px rgba(16, 185, 129, 0.15)",

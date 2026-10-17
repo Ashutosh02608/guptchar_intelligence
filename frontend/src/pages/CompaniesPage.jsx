@@ -339,7 +339,7 @@ export function CompaniesPage({ API_BASE = DEFAULT_API_BASE }) {
         {/* KPI Cards */}
         <div style={{
           display: "grid",
-          gridTemplateColumns: "repeat(auto-fit, minmax(210px, 1fr))",
+          gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 200px), 1fr))",
           gap: "14px"
         }}>
           <div style={{
@@ -486,7 +486,7 @@ export function CompaniesPage({ API_BASE = DEFAULT_API_BASE }) {
               </select>
             )}
 
-            <div style={{ position: "relative", minWidth: "220px" }}>
+            <div style={{ position: "relative", minWidth: "min(100%, 220px)", flex: "1 1 200px" }}>
               <Search size={14} style={{ position: "absolute", left: "10px", top: "9px", color: "var(--text-dim)" }} />
               <input
                 type="text"
@@ -558,7 +558,7 @@ export function CompaniesPage({ API_BASE = DEFAULT_API_BASE }) {
                   gap: "12px"
                 }}>
                   {/* Company Identity */}
-                  <div style={{ display: "flex", alignItems: "flex-start", gap: "14px", flex: 1, minWidth: "260px" }}>
+                  <div style={{ display: "flex", alignItems: "flex-start", gap: "14px", flex: 1, minWidth: "min(100%, 240px)" }}>
                     <div style={{
                       width: "42px", height: "42px", borderRadius: "10px",
                       background: comp.is_subscribed ? "rgba(16, 185, 129, 0.15)" : "rgba(255, 255, 255, 0.05)",
@@ -715,7 +715,7 @@ export function CompaniesPage({ API_BASE = DEFAULT_API_BASE }) {
                   paddingTop: "12px",
                   borderTop: "1px solid rgba(255, 255, 255, 0.06)",
                   display: "grid",
-                  gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
+                  gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 200px), 1fr))",
                   gap: "10px"
                 }}>
                   {/* Founder / Co-Founder */}
@@ -839,12 +839,12 @@ export function CompaniesPage({ API_BASE = DEFAULT_API_BASE }) {
           alignItems: "center",
           justifyContent: "center",
           zIndex: 9999,
-          padding: "20px"
+          padding: "10px"
         }}>
           <div className="glass-panel" style={{
             width: "100%",
             maxWidth: "780px",
-            maxHeight: "90vh",
+            maxHeight: "92vh",
             display: "flex",
             flexDirection: "column",
             borderRadius: "16px",
@@ -854,11 +854,13 @@ export function CompaniesPage({ API_BASE = DEFAULT_API_BASE }) {
           }}>
             {/* Modal Header */}
             <div style={{
-              padding: "18px 24px",
+              padding: "16px 20px",
               borderBottom: "1px solid rgba(255, 255, 255, 0.08)",
               display: "flex",
               justifyContent: "space-between",
-              alignItems: "center"
+              alignItems: "center",
+              flexWrap: "wrap",
+              gap: "10px"
             }}>
               <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
                 <div style={{

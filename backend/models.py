@@ -35,6 +35,8 @@ class RegulatoryUpdate(BaseModel):
     content_hash: str
     is_read: bool = False
     pinned: bool = False
+    effective_deadline: Optional[str] = None
+    compliance_urgency: Optional[str] = None
 
 class SystemStats(BaseModel):
     is_running: bool

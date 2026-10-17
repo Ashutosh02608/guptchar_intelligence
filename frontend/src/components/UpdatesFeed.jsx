@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { 
   Search, 
   ExternalLink, 
@@ -8,16 +8,38 @@ import {
   SlidersHorizontal,
   ChevronRight,
   Share2,
-  Bookmark
+  Bookmark,
+  ArrowRight,
+  Activity,
+  Timer,
+  Calendar,
+  AlertTriangle
 } from "lucide-react";
+import { calculateDeadlineInfo, getRadarSummary } from "../utils/deadlineTracker";
 
-export function UpdatesFeed({ updates, onSelectUpdate, onMarkAllRead, onMarkRead, onResetFeed }) {
-
-
+export function UpdatesFeed({ 
+  updates, 
+  onSelectUpdate, 
+  onMarkAllRead, 
+  onMarkRead, 
+  onResetFeed,
+  onNavigateToFullView,
+  isEmbedded = false
+}) {
   const [jurisdictionFilter, setJurisdictionFilter] = useState("ALL");
   const [severityFilter, setSeverityFilter] = useState("ALL");
+  const [deadlineFilter, setDeadlineFilter] = useState("ALL");
   const [searchQuery, setSearchQuery] = useState("");
   const [copiedId, setCopiedId] = useState(null);
+  const [currentTime, setCurrentTime] = useState(Date.now());
+
+  // Periodically update current time to keep countdown tickers fresh
+  useEffect(() => {
+    const timer = setInterval(() => setCurrentTime(Date.now()), 20000);
+    return () => clearInterval(timer);
+  }, []);
+
+  const radarStats = useMemo(() => getRadarSummary(updates), [updates, currentTime]);
 
   const getJurisdictionFlag = (code) => {
     switch (code) {
@@ -58,6 +80,16 @@ export function UpdatesFeed({ updates, onSelectUpdate, onMarkAllRead, onMarkRead
   const filteredUpdates = updates.filter((item) => {
     if (jurisdictionFilter !== "ALL" && item.jurisdiction !== jurisdictionFilter) return false;
     if (severityFilter !== "ALL" && item.severity !== severityFilter) return false;
+    if (deadlineFilter !== "ALL") {
+      const dInfo = calculateDeadlineInfo(item, currentTime);
+      if (deadlineFilter === "IMMEDIATE") {
+        if (dInfo.urgencyTier !== "IMMEDIATE" && !dInfo.isOverdue) return false;
+      } else if (deadlineFilter === "APPROACHING") {
+        if (dInfo.urgencyTier !== "APPROACHING") return false;
+      } else if (deadlineFilter === "SCHEDULED") {
+        if (dInfo.urgencyTier !== "SCHEDULED") return false;
+      }
+    }
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase();
       const matchTitle = item.title?.toLowerCase().includes(q);
@@ -69,19 +101,30 @@ export function UpdatesFeed({ updates, onSelectUpdate, onMarkAllRead, onMarkRead
   });
 
   return (
-    <div className="glass-panel" style={{ padding: "20px" }}>
+    <div className={`glass-panel ${isEmbedded ? "updates-feed-embedded" : ""}`} style={{ padding: "20px", height: "100%", display: "flex", flexDirection: "column" }}>
       {/* Header and Quick Actions */}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "12px", marginBottom: "16px" }}>
         <div>
           <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-            <h2 style={{ fontSize: "1.1rem", fontWeight: "700", color: "#ffffff" }}>
-              LIVE REGULATORY STREAM & CIRCULARS
+            <h2 style={{ fontSize: "1.05rem", fontWeight: "700", color: "#ffffff", margin: 0, display: "flex", alignItems: "center", gap: "8px" }}>
+              <Activity size={17} color="var(--neon-cyan)" />
+              <span>LIVE REGULATORY STREAM</span>
             </h2>
             <span className="badge badge-medium">
               {filteredUpdates.length} Records
             </span>
+            {deadlineFilter !== "ALL" && (
+              <span 
+                className="badge badge-critical" 
+                style={{ fontSize: "0.68rem", cursor: "pointer" }}
+                onClick={() => setDeadlineFilter("ALL")}
+                title="Click to clear deadline filter"
+              >
+                Radar Filter: {deadlineFilter} ✕
+              </span>
+            )}
           </div>
-          <p style={{ fontSize: "0.78rem", color: "var(--text-muted)", margin: 0 }}>
+          <p style={{ fontSize: "0.78rem", color: "var(--text-muted)", margin: "3px 0 0" }}>
             Real-time feed indexed by Guptchar 10-second sweep surveillance
           </p>
         </div>
@@ -107,6 +150,19 @@ export function UpdatesFeed({ updates, onSelectUpdate, onMarkAllRead, onMarkRead
             <CheckCheck size={14} color="var(--neon-emerald)" />
             <span>Mark All Read</span>
           </button>
+
+          {onNavigateToFullView && (
+            <button 
+              id="btn-feed-full-view"
+              className="btn btn-secondary" 
+              style={{ fontSize: "0.78rem", padding: "6px 12px" }}
+              onClick={onNavigateToFullView}
+              title="Open full updates stream"
+            >
+              <span>Full View</span>
+              <ArrowRight size={13} />
+            </button>
+          )}
         </div>
       </div>
 
@@ -144,11 +200,120 @@ export function UpdatesFeed({ updates, onSelectUpdate, onMarkAllRead, onMarkRead
           />
         </div>
 
+        {/* Regulatory Deadline Radar Bar */}
+        <div style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          flexWrap: "wrap",
+          gap: "10px",
+          padding: "8px 12px",
+          background: "linear-gradient(90deg, rgba(6, 182, 212, 0.08) 0%, rgba(15, 23, 42, 0.6) 100%)",
+          borderRadius: "var(--radius-sm)",
+          border: "1px solid rgba(6, 182, 212, 0.2)"
+        }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+            <Timer size={14} color="var(--neon-cyan)" />
+            <span style={{ fontSize: "0.75rem", fontWeight: "700", color: "#e2e8f0", letterSpacing: "0.04em" }}>
+              COMPLIANCE DEADLINE RADAR:
+            </span>
+          </div>
+
+          <div className="scroll-touch-x" style={{ display: "flex", alignItems: "center", gap: "6px", flexWrap: "wrap" }}>
+            <button
+              id="filter-deadline-all"
+              onClick={() => setDeadlineFilter("ALL")}
+              style={{
+                padding: "3px 8px",
+                fontSize: "0.71rem",
+                fontWeight: "600",
+                borderRadius: "4px",
+                border: deadlineFilter === "ALL" ? "1px solid var(--neon-cyan)" : "1px solid rgba(255, 255, 255, 0.08)",
+                background: deadlineFilter === "ALL" ? "rgba(6, 182, 212, 0.25)" : "rgba(255, 255, 255, 0.03)",
+                color: deadlineFilter === "ALL" ? "var(--neon-cyan)" : "var(--text-muted)",
+                cursor: "pointer",
+                transition: "all 0.15s ease"
+              }}
+            >
+              All Deadlines ({radarStats.total})
+            </button>
+
+            <button
+              id="filter-deadline-immediate"
+              onClick={() => setDeadlineFilter(deadlineFilter === "IMMEDIATE" ? "ALL" : "IMMEDIATE")}
+              style={{
+                padding: "3px 8px",
+                fontSize: "0.71rem",
+                fontWeight: "600",
+                borderRadius: "4px",
+                border: deadlineFilter === "IMMEDIATE" ? "1px solid #ef4444" : "1px solid rgba(239, 68, 68, 0.25)",
+                background: deadlineFilter === "IMMEDIATE" ? "rgba(239, 68, 68, 0.25)" : "rgba(239, 68, 68, 0.06)",
+                color: "#f87171",
+                cursor: "pointer",
+                display: "flex",
+                alignItems: "center",
+                gap: "5px",
+                transition: "all 0.15s ease"
+              }}
+              title="Prioritize circulars with compliance deadlines under 7 days"
+            >
+              <span style={{ width: "6px", height: "6px", borderRadius: "50%", background: "#ef4444" }} />
+              <span>🔴 Urgent &lt;7d ({radarStats.immediate})</span>
+            </button>
+
+            <button
+              id="filter-deadline-approaching"
+              onClick={() => setDeadlineFilter(deadlineFilter === "APPROACHING" ? "ALL" : "APPROACHING")}
+              style={{
+                padding: "3px 8px",
+                fontSize: "0.71rem",
+                fontWeight: "600",
+                borderRadius: "4px",
+                border: deadlineFilter === "APPROACHING" ? "1px solid #f59e0b" : "1px solid rgba(245, 158, 11, 0.25)",
+                background: deadlineFilter === "APPROACHING" ? "rgba(245, 158, 11, 0.25)" : "rgba(245, 158, 11, 0.06)",
+                color: "#fbbf24",
+                cursor: "pointer",
+                display: "flex",
+                alignItems: "center",
+                gap: "5px",
+                transition: "all 0.15s ease"
+              }}
+              title="Prioritize circulars with compliance deadlines within 30 days"
+            >
+              <span style={{ width: "6px", height: "6px", borderRadius: "50%", background: "#f59e0b" }} />
+              <span>🟡 Approaching &lt;30d ({radarStats.approaching})</span>
+            </button>
+
+            <button
+              id="filter-deadline-scheduled"
+              onClick={() => setDeadlineFilter(deadlineFilter === "SCHEDULED" ? "ALL" : "SCHEDULED")}
+              style={{
+                padding: "3px 8px",
+                fontSize: "0.71rem",
+                fontWeight: "600",
+                borderRadius: "4px",
+                border: deadlineFilter === "SCHEDULED" ? "1px solid #10b981" : "1px solid rgba(16, 185, 129, 0.25)",
+                background: deadlineFilter === "SCHEDULED" ? "rgba(16, 185, 129, 0.25)" : "rgba(16, 185, 129, 0.06)",
+                color: "#34d399",
+                cursor: "pointer",
+                display: "flex",
+                alignItems: "center",
+                gap: "5px",
+                transition: "all 0.15s ease"
+              }}
+              title="Circulars with statutory horizon deadlines (30 days or more)"
+            >
+              <span style={{ width: "6px", height: "6px", borderRadius: "50%", background: "#10b981" }} />
+              <span>🟢 Scheduled 30d+ ({radarStats.scheduled})</span>
+            </button>
+          </div>
+        </div>
+
         {/* Filter buttons */}
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "10px" }}>
           {/* Jurisdiction Filters */}
-          <div style={{ display: "flex", alignItems: "center", gap: "6px", flexWrap: "wrap" }}>
-            <span style={{ fontSize: "0.72rem", color: "var(--text-dim)", marginRight: "4px" }}>JURISDICTION:</span>
+          <div className="scroll-touch-x" style={{ display: "flex", alignItems: "center", gap: "6px", flexWrap: "wrap" }}>
+            <span style={{ fontSize: "0.72rem", color: "var(--text-dim)", marginRight: "4px", whiteSpace: "nowrap" }}>JURISDICTION:</span>
             {[
               { id: "ALL", label: "ALL" },
               { id: "IN", label: "🇮🇳 INDIA" },
@@ -168,6 +333,7 @@ export function UpdatesFeed({ updates, onSelectUpdate, onMarkAllRead, onMarkRead
                   background: jurisdictionFilter === f.id ? "rgba(6, 182, 212, 0.2)" : "rgba(255, 255, 255, 0.03)",
                   color: jurisdictionFilter === f.id ? "var(--neon-cyan)" : "var(--text-muted)",
                   cursor: "pointer",
+                  whiteSpace: "nowrap",
                   transition: "all 0.15s ease"
                 }}
               >
@@ -177,8 +343,8 @@ export function UpdatesFeed({ updates, onSelectUpdate, onMarkAllRead, onMarkRead
           </div>
 
           {/* Severity Filters */}
-          <div style={{ display: "flex", alignItems: "center", gap: "6px", flexWrap: "wrap" }}>
-            <span style={{ fontSize: "0.72rem", color: "var(--text-dim)", marginRight: "4px" }}>SEVERITY:</span>
+          <div className="scroll-touch-x" style={{ display: "flex", alignItems: "center", gap: "6px", flexWrap: "wrap" }}>
+            <span style={{ fontSize: "0.72rem", color: "var(--text-dim)", marginRight: "4px", whiteSpace: "nowrap" }}>SEVERITY:</span>
             {["ALL", "CRITICAL", "HIGH", "MEDIUM", "INFO"].map((s) => (
               <button
                 key={s}
@@ -192,6 +358,7 @@ export function UpdatesFeed({ updates, onSelectUpdate, onMarkAllRead, onMarkRead
                   background: severityFilter === s ? "rgba(16, 185, 129, 0.2)" : "rgba(255, 255, 255, 0.03)",
                   color: severityFilter === s ? "var(--neon-emerald)" : "var(--text-muted)",
                   cursor: "pointer",
+                  whiteSpace: "nowrap",
                   transition: "all 0.15s ease"
                 }}
               >
@@ -203,14 +370,29 @@ export function UpdatesFeed({ updates, onSelectUpdate, onMarkAllRead, onMarkRead
       </div>
 
       {/* List of Circular Cards */}
-      <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+      <div 
+        className={`sidebar-scroll-area ${isEmbedded ? "command-center-scroll-body" : ""}`}
+        style={{ 
+          display: "flex", 
+          flexDirection: "column", 
+          gap: "10px", 
+          flex: 1,
+          overflowY: isEmbedded ? "auto" : "visible",
+          paddingRight: isEmbedded ? "4px" : 0
+        }}
+      >
         {filteredUpdates.length === 0 ? (
           <div style={{ 
             textAlign: "center", 
             padding: "48px 24px", 
-            background: "rgba(0, 0, 0, 0.2)",
+            background: "rgba(0, 0, 0, 0.2)", 
             borderRadius: "var(--radius-md)",
-            border: "1px dashed rgba(16, 185, 129, 0.25)"
+            border: "1px dashed rgba(16, 185, 129, 0.25)",
+            flex: 1,
+            display: "flex",
+            flexDirection: "column",
+            justifyContent: "center",
+            alignItems: "center"
           }}>
             <div style={{ 
               width: "48px", 
@@ -236,6 +418,8 @@ export function UpdatesFeed({ updates, onSelectUpdate, onMarkAllRead, onMarkRead
           filteredUpdates.map((item) => {
             const isCritical = item.severity === "CRITICAL";
             const isHigh = item.severity === "HIGH";
+            const deadlineInfo = calculateDeadlineInfo(item, currentTime);
+            const isUrgentDeadline = deadlineInfo?.urgencyTier === "IMMEDIATE" || deadlineInfo?.isOverdue;
 
             return (
               <div
@@ -246,7 +430,9 @@ export function UpdatesFeed({ updates, onSelectUpdate, onMarkAllRead, onMarkRead
                 }}
                 style={{
                   background: item.is_read ? "rgba(14, 21, 37, 0.5)" : "rgba(17, 26, 46, 0.9)",
-                  border: isCritical 
+                  border: isUrgentDeadline
+                    ? "1px solid rgba(239, 68, 68, 0.55)"
+                    : isCritical 
                     ? "1px solid rgba(239, 68, 68, 0.45)" 
                     : isHigh 
                     ? "1px solid rgba(245, 158, 11, 0.35)" 
@@ -255,7 +441,11 @@ export function UpdatesFeed({ updates, onSelectUpdate, onMarkAllRead, onMarkRead
                   padding: "14px 18px",
                   cursor: "pointer",
                   transition: "all 0.2s ease",
-                  boxShadow: isCritical ? "0 0 15px rgba(239, 68, 68, 0.12)" : "none",
+                  boxShadow: isUrgentDeadline 
+                    ? "0 0 16px rgba(239, 68, 68, 0.16)" 
+                    : isCritical 
+                    ? "0 0 15px rgba(239, 68, 68, 0.12)" 
+                    : "none",
                   position: "relative"
                 }}
                 onMouseEnter={(e) => {
@@ -263,7 +453,9 @@ export function UpdatesFeed({ updates, onSelectUpdate, onMarkAllRead, onMarkRead
                   e.currentTarget.style.transform = "translateY(-1px)";
                 }}
                 onMouseLeave={(e) => {
-                  e.currentTarget.style.borderColor = isCritical 
+                  e.currentTarget.style.borderColor = isUrgentDeadline
+                    ? "rgba(239, 68, 68, 0.55)"
+                    : isCritical 
                     ? "rgba(239, 68, 68, 0.45)" 
                     : isHigh 
                     ? "rgba(245, 158, 11, 0.35)" 
@@ -273,7 +465,7 @@ export function UpdatesFeed({ updates, onSelectUpdate, onMarkAllRead, onMarkRead
               >
                 {/* Top metadata line */}
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px", flexWrap: "wrap", gap: "6px" }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
                     {/* Severity chip */}
                     <span className={`badge ${getSeverityBadgeClass(item.severity)}`}>
                       {item.severity}
@@ -289,6 +481,33 @@ export function UpdatesFeed({ updates, onSelectUpdate, onMarkAllRead, onMarkRead
                     <span style={{ fontSize: "0.7rem", color: "var(--text-dim)", background: "rgba(255, 255, 255, 0.05)", padding: "2px 6px", borderRadius: "4px" }}>
                       {item.category}
                     </span>
+
+                    {/* Live Compliance Deadline Countdown Ticker */}
+                    {deadlineInfo && (
+                      <span 
+                        style={{
+                          display: "inline-flex",
+                          alignItems: "center",
+                          gap: "4px",
+                          padding: "2px 7px",
+                          borderRadius: "4px",
+                          fontSize: "0.71rem",
+                          fontWeight: "700",
+                          background: isUrgentDeadline
+                            ? "rgba(239, 68, 68, 0.2)"
+                            : deadlineInfo.urgencyTier === "APPROACHING"
+                            ? "rgba(245, 158, 11, 0.16)"
+                            : "rgba(16, 185, 129, 0.12)",
+                          border: `1px solid ${deadlineInfo.tierColor}66`,
+                          color: deadlineInfo.tierColor,
+                          letterSpacing: "0.02em"
+                        }}
+                        title={`Enforcement Deadline: ${deadlineInfo.formattedDate} (${deadlineInfo.stageTitle})`}
+                      >
+                        <Timer size={11} style={{ flexShrink: 0 }} />
+                        <span>{deadlineInfo.compactBadge}</span>
+                      </span>
+                    )}
                   </div>
 
                   <div style={{ display: "flex", alignItems: "center", gap: "10px", fontSize: "0.72rem", color: "var(--text-dim)" }}>
@@ -320,11 +539,19 @@ export function UpdatesFeed({ updates, onSelectUpdate, onMarkAllRead, onMarkRead
                   </p>
                 )}
 
-                {/* Footer with actions */}
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", paddingTop: "8px", borderTop: "1px solid rgba(255, 255, 255, 0.04)" }}>
-                  <span style={{ fontSize: "0.7rem", color: "var(--text-dim)" }}>
-                    {item.published_date ? `Published: ${item.published_date}` : "Official Listing"}
-                  </span>
+                {/* Footer with actions and Target Deadline */}
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "8px", paddingTop: "8px", borderTop: "1px solid rgba(255, 255, 255, 0.04)" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: "12px", flexWrap: "wrap" }}>
+                    <span style={{ fontSize: "0.7rem", color: "var(--text-dim)" }}>
+                      {item.published_date ? `Published: ${item.published_date}` : "Official Listing"}
+                    </span>
+                    {deadlineInfo && (
+                      <span style={{ display: "inline-flex", alignItems: "center", gap: "4px", fontSize: "0.7rem", color: "var(--text-muted)" }}>
+                        <Calendar size={11} color="var(--neon-cyan)" />
+                        <span>Deadline: <strong style={{ color: "#cbd5e1" }}>{deadlineInfo.formattedDate}</strong></span>
+                      </span>
+                    )}
+                  </div>
 
                   <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
                     <button

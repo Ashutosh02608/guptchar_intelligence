@@ -78,7 +78,7 @@ export function SettingsPage({ isMuted, onToggleMute, onResetFeed }) {
             Synthesized audio tones generated via the HTML5 Web Audio API directly in your browser. When newly published regulations (such as critical circulars or trading halts) are detected during the 10-second sweep, the alert chime sounds immediately.
           </p>
 
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", background: "rgba(0, 0, 0, 0.25)", padding: "14px 18px", borderRadius: "var(--radius-md)", border: "1px solid rgba(255, 255, 255, 0.05)" }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: "14px", background: "rgba(0, 0, 0, 0.25)", padding: "14px 18px", borderRadius: "var(--radius-md)", border: "1px solid rgba(255, 255, 255, 0.05)" }}>
             <div>
               <div style={{ fontSize: "0.88rem", fontWeight: "600", color: "#ffffff" }}>
                 Audio Surveillance Alarm
@@ -110,7 +110,7 @@ export function SettingsPage({ isMuted, onToggleMute, onResetFeed }) {
             The system takes an immutable cryptographic SHA-256 snapshot of all existing announcements on SEBI, RBI, US SEC, UK FCA, and ESMA. Only brand new releases published after this moment will trigger alerts. If you wish to wipe the feed and re-synchronize the baseline to the current second, use this tool.
           </p>
 
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", background: "rgba(0, 0, 0, 0.25)", padding: "14px 18px", borderRadius: "var(--radius-md)", border: "1px solid rgba(255, 255, 255, 0.05)" }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: "14px", background: "rgba(0, 0, 0, 0.25)", padding: "14px 18px", borderRadius: "var(--radius-md)", border: "1px solid rgba(255, 255, 255, 0.05)" }}>
             <div>
               <div style={{ fontSize: "0.88rem", fontWeight: "600", color: "#ffffff" }}>
                 Re-establish Watermark Baseline
@@ -149,7 +149,7 @@ export function SettingsPage({ isMuted, onToggleMute, onResetFeed }) {
           </p>
 
           {/* Current Configuration Summary */}
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: "10px", marginBottom: "18px" }}>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 160px), 1fr))", gap: "10px", marginBottom: "18px" }}>
             <div style={{ background: "rgba(0,0,0,0.3)", padding: "12px 14px", borderRadius: "8px", border: "1px solid rgba(255,255,255,0.05)" }}>
               <div style={{ fontSize: "0.7rem", color: "var(--text-dim)", textTransform: "uppercase" }}>SMTP HOST</div>
               <div className="mono" style={{ fontSize: "0.88rem", fontWeight: "600", color: "#ffffff", marginTop: "2px" }}>

@@ -15,7 +15,8 @@ import {
   LogOut,
   Bell,
   Menu,
-  X
+  X,
+  Calendar
 } from "lucide-react";
 
 export function Navigation({ 
@@ -43,6 +44,7 @@ export function Navigation({
     { id: "boards", label: "Boards", icon: Layers, badge: boardsCount },
     { id: "updates", label: "Updates", icon: FileText, badge: updatesCount > 0 ? updatesCount : null },
     { id: "outbox", label: "Outbox", icon: Mail, badge: outboxCount > 0 ? outboxCount : null, isOutbox: true },
+    { id: "calendar", label: "Compliance Calendar", icon: Calendar },
     { id: "companies", label: "Companies", icon: Building, badge: companiesCount > 0 ? companiesCount : null },
     { id: "telemetry", label: "Telemetry Logs", icon: Activity },
     { id: "settings", label: "Settings", icon: Sliders },

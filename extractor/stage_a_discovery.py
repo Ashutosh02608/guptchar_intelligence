@@ -19,6 +19,58 @@ from .models import EnrichedEntity
 
 logger = logging.getLogger("extractor.stage_a")
 
+# Negative blacklist patterns: ATMs, public infrastructure, transit, residential structures, landmarks
+BOGUS_NODE_PATTERNS = [
+    r'\b(atm|cdm|cash machine|cash point|coin machine|cash deposit|locker|safe deposit)\b',
+    r'\b(metro station|subway station|railway station|bus station|bus stop|train station|ferry terminal|airport|parking lot|parking garage|toll plaza|highway|expressway|flyover)\b',
+    r'\b(post office|police station|police booth|fire station|courthouse|embassy|consulate|passport office|municipal corporation)\b',
+    r'\b(temple|church|mosque|shrine|gurdwara|synagogue|cathedral|chapel|monastery|cemetery|graveyard)\b',
+    r'\b(apartment[s]?|residency|residential complex|housing society|enclave|colony|mohalla|chowk|crossroad|circle|junction)\b',
+    r'\b(government hospital|public school|high school|kindergarten|playground|public park|garden|zoo)\b',
+]
+
+EXCLUDED_NAME_TOKENS = {
+    "n/a", "directions", "website", "share", "save", "call", "reviews",
+    "overview", "photos", "about", "unknown", "open", "closed", "nearby",
+    "results", "search", "menu", "claim this business", "suggest an edit"
+}
+
+def is_legit_corporate_entity(name: str, city: str = "", country: str = "") -> bool:
+    """
+    Validates if an extracted Maps/OSM listing represents an authentic commercial enterprise
+    rather than an ATM, transit stop, residential compound, or UI artifact.
+    """
+    if not name or not isinstance(name, str):
+        return False
+    
+    clean = name.strip()
+    clean_lower = clean.lower()
+
+    # Minimum length and must contain alphabetical characters
+    if len(clean) < 3 or not re.search(r'[a-zA-Z]{2,}', clean):
+        return False
+
+    # Exclude UI tokens
+    if clean_lower in EXCLUDED_NAME_TOKENS:
+        return False
+
+    # Exclude if name is merely the city or country itself
+    if city and clean_lower == city.strip().lower():
+        return False
+    if country and clean_lower == country.strip().lower():
+        return False
+
+    # Exclude if name is purely street/plot numbering
+    if re.match(r'^(?:sector\s*\d+|road|street|gali|lane|plot\s*no|lane\s*\d+)\b', clean_lower):
+        return False
+
+    # Exclude non-corporate landmarks, transit, ATMs, etc.
+    for pat in BOGUS_NODE_PATTERNS:
+        if re.search(pat, clean_lower):
+            return False
+
+    return True
+
 
 class GoogleMapsScraper:
     def __init__(self, headless: bool = True):
@@ -91,7 +143,7 @@ class GoogleMapsScraper:
         country: str,
         city: str,
         sector: str,
-        limit: int = 20
+        limit: int = 50
     ) -> List[EnrichedEntity]:
         """
         Execute Google Maps search with CDP masking, scroll feed, and extract places.
@@ -156,15 +208,20 @@ class GoogleMapsScraper:
                         if lines:
                             name = lines[0]
 
-                    if not name or name in ("N/A", "Directions", "Website") or name in seen_names:
+                    if not is_legit_corporate_entity(name, city, country) or name in seen_names:
                         continue
                     seen_names.add(name)
 
-                    # Extract website
+                    # Extract website (filter out search engines, social shares, and web standard schemas)
                     website = "N/A"
                     web_matches = re.findall(r'href="(https?://[^"]+)"', html_content)
                     for url in web_matches:
-                        if "google.com" not in url and "gstatic.com" not in url and "schema.org" not in url:
+                        url_lower = url.lower()
+                        if not any(blocked in url_lower for blocked in [
+                            "google.com", "gstatic.com", "schema.org", "facebook.com",
+                            "twitter.com", "x.com", "instagram.com", "linkedin.com",
+                            "w3.org", "wikipedia.org", "youtube.com"
+                        ]):
                             website = url
                             break
 
@@ -220,38 +277,59 @@ class FallbackDiscoveryGenerator:
         country: str,
         city: str,
         sector: str,
-        limit: int = 20
+        limit: int = 50
     ) -> List[EnrichedEntity]:
         logger.info(f"Stage A [Fallback]: Invoking intelligent entity discovery for '{sector}' in {city}, {country}")
         entities: List[EnrichedEntity] = []
 
-        # Attempt 1: Query OpenStreetMap Nominatim for real commercial nodes
+        # Attempt 1: Query OpenStreetMap Nominatim for real commercial nodes with extratags
         try:
             headers = {"User-Agent": "GuptcharResearchBot/1.0 (contact@guptchar.internal)"}
             osm_query = f"{sector} {city} {country}"
-            url = f"https://nominatim.openstreetmap.org/search?q={urllib.parse.quote_plus(osm_query)}&format=json&addressdetails=1&limit={limit}"
+            url = f"https://nominatim.openstreetmap.org/search?q={urllib.parse.quote_plus(osm_query)}&format=json&addressdetails=1&extratags=1&limit={limit}"
             
             with httpx.Client(timeout=8.0, headers=headers) as client:
                 resp = client.get(url)
                 if resp.status_code == 200:
                     data = resp.json()
                     for item in data:
-                        name = item.get("display_name", "").split(",")[0].strip()
+                        raw_name = item.get("display_name", "").split(",")[0].strip()
                         display_name = item.get("display_name", f"{city}, {country}")
-                        if name and name.lower() not in [e.name.lower() for e in entities]:
-                            clean_slug = re.sub(r'[^a-zA-Z0-9]', '', name).lower()[:18]
-                            entities.append(EnrichedEntity(
-                                name=name,
-                                sector=sector,
-                                country=country,
-                                city=city,
-                                physical_address=display_name,
-                                website_url=f"https://www.{clean_slug}.com",
-                                gatekeeper_phone="N/A",
-                                data_provenance="OpenStreetMap / Registry"
-                            ))
-                            if len(entities) >= limit:
-                                break
+
+                        # Quality Gate: Exclude non-corporate landmarks, transit, ATMs, and apartments
+                        if not is_legit_corporate_entity(raw_name, city, country):
+                            continue
+
+                        if raw_name.lower() in [e.name.lower() for e in entities]:
+                            continue
+
+                        # Extract authentic website from OSM extratags (Disallow synthetic URL guessing)
+                        extratags = item.get("extratags") or {}
+                        authentic_site = (
+                            extratags.get("website") or
+                            extratags.get("contact:website") or
+                            extratags.get("url") or
+                            "N/A"
+                        ).strip()
+
+                        if authentic_site and authentic_site != "N/A":
+                            if not authentic_site.startswith("http://") and not authentic_site.startswith("https://"):
+                                authentic_site = f"https://{authentic_site}"
+                        else:
+                            authentic_site = "N/A"
+
+                        entities.append(EnrichedEntity(
+                            name=raw_name,
+                            sector=sector,
+                            country=country,
+                            city=city,
+                            physical_address=display_name,
+                            website_url=authentic_site,
+                            gatekeeper_phone="N/A",
+                            data_provenance="OpenStreetMap / Registry"
+                        ))
+                        if len(entities) >= limit:
+                            break
         except Exception as e:
             logger.debug(f"OSM lookup notice: {e}")
 
@@ -263,7 +341,7 @@ def run_stage_a(
     country: str,
     city: str,
     sector: str,
-    limit: int = 20,
+    limit: int = 50,
     try_selenium: bool = True
 ) -> List[EnrichedEntity]:
     """

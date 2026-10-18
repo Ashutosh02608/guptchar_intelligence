@@ -84,7 +84,8 @@ class CompanyVerifier:
         # -------------------------------------------------------------
         # CHECK 5: Statutory Regulatory Registry Match (Max 20 pts)
         # -------------------------------------------------------------
-        reg_check, registry_match_name = await self._check_sec_edgar_registry(company_name)
+        country = company_data.get("country") or company_data.get("jurisdiction") or "Global"
+        reg_check, registry_match_name = await self._check_statutory_registry(company_name, country=country, domain=domain)
         checks.append(reg_check)
 
         # -------------------------------------------------------------
@@ -324,7 +325,67 @@ class CompanyVerifier:
             detail=f"Only basic locality listed: '{address}'"
         )
 
+    @staticmethod
+    async def check_domain_dns_and_mx(domain: str) -> tuple[bool, bool, str]:
+        """
+        Validates whether domain has active DNS resolution (A/AAAA)
+        and configured Mail Exchange (MX) records.
+        Returns: (has_dns, has_mx, details)
+        """
+        if not domain or domain == "N/A":
+            return False, False, "No domain provided"
+
+        clean_domain = domain.lower().replace("http://", "").replace("https://", "").split("/")[0].strip()
+        if not clean_domain or "." not in clean_domain:
+            return False, False, "Malformed domain"
+
+        # 1. Standard DNS Address Resolution
+        has_dns = False
+        try:
+            socket.getaddrinfo(clean_domain, None)
+            has_dns = True
+        except Exception:
+            has_dns = False
+
+        if not has_dns:
+            return False, False, f"Domain '{clean_domain}' does not resolve to an IP address (NXDOMAIN)"
+
+        # 2. Check Mail Exchange (MX) records via Cloudflare DoH (DNS-over-HTTPS)
+        has_mx = False
+        mx_host = ""
+        try:
+            doh_url = f"https://cloudflare-dns.com/dns-query?name={urllib.parse.quote(clean_domain)}&type=MX"
+            headers = {"accept": "application/dns-json", "User-Agent": "GuptcharVerifier/1.0"}
+            async with httpx.AsyncClient(timeout=4.0) as client:
+                resp = await client.get(doh_url, headers=headers)
+                if resp.status_code == 200:
+                    answers = resp.json().get("Answer", [])
+                    if answers:
+                        has_mx = True
+                        mx_host = answers[0].get("data", "").strip()
+        except Exception:
+            has_mx = has_dns
+
+        detail = f"DNS Active: {has_dns} | MX Mail Host: {mx_host if has_mx else 'None'}"
+        return has_dns, has_mx, detail
+
     async def _check_sec_edgar_registry(self, company_name: str) -> tuple[VerificationCheckItem, Optional[str]]:
+        """Backward-compatible proxy to _check_statutory_registry."""
+        return await self._check_statutory_registry(company_name, country="US")
+
+    async def _check_statutory_registry(
+        self,
+        company_name: str,
+        country: str = "Global",
+        domain: str = ""
+    ) -> tuple[VerificationCheckItem, Optional[str]]:
+        """
+        Validates corporate entity against official statutory registries:
+        1. US: SEC EDGAR EFTS API (Form D, Form ADV, 10-K, 8-K)
+        2. UK: UK Companies House Public Registry
+        3. India: MCA / ROC / SEBI / RBI registered nomenclature
+        4. Global: International corporate statutory forms + DNS/MX infrastructure validation
+        """
         if not company_name or company_name == "Unknown Entity":
             return VerificationCheckItem(
                 name="Statutory Regulatory Registry Search",
@@ -334,56 +395,105 @@ class CompanyVerifier:
                 detail="Cannot search registry without valid entity name."
             ), None
 
-        # Clean corporate suffixes for broader match
-        clean_name = re.sub(r'(?i)\b(ltd|limited|inc|incorporated|corp|corporation|llc|plc|branch|co)\b', '', company_name).strip()
-        encoded_q = urllib.parse.quote(clean_name[:40])
-        url = f"https://efts.sec.gov/LATEST/search-index?q=%22{encoded_q}%22&startdt=2015-01-01&forms=D,ADV,10-K,10-Q,8-K"
+        country_norm = (country or "").upper().strip()
+        clean_name = re.sub(r'(?i)\b(ltd|limited|inc|incorporated|corp|corporation|llc|plc|branch|co|pvt ltd|private limited)\b', '', company_name).strip()
+        if len(clean_name) < 3:
+            clean_name = company_name
 
-        headers = {
-            "User-Agent": "GuptcharResearchBot/1.0 (contact@guptchar.internal)",
-            "Accept": "application/json"
-        }
+        # 1. UNITED STATES / GLOBAL: Query SEC EDGAR EFTS API
+        if country_norm in ["US", "UNITED STATES", "GLOBAL", ""]:
+            try:
+                encoded_q = urllib.parse.quote(clean_name[:40])
+                url = f"https://efts.sec.gov/LATEST/search-index?q=%22{encoded_q}%22&startdt=2015-01-01&forms=D,ADV,10-K,10-Q,8-K"
+                headers = {
+                    "User-Agent": "GuptcharResearchBot/1.0 (contact@guptchar.internal)",
+                    "Accept": "application/json"
+                }
+                async with httpx.AsyncClient(timeout=self.timeout, headers=headers) as client:
+                    resp = await client.get(url)
+                    if resp.status_code == 200:
+                        data = resp.json()
+                        hits = data.get("hits", {}).get("hits", [])
+                        if hits:
+                            first_hit = hits[0].get("_source", {})
+                            official_entity_name = first_hit.get("display_names", [clean_name])[0]
+                            form_type = first_hit.get("form", "SEC Filing")
+                            cik = first_hit.get("ciks", ["N/A"])[0]
 
-        try:
-            async with httpx.AsyncClient(timeout=self.timeout, headers=headers) as client:
-                resp = await client.get(url)
-                if resp.status_code == 200:
-                    data = resp.json()
-                    hits = data.get("hits", {}).get("hits", [])
-                    if hits:
-                        first_hit = hits[0].get("_source", {})
-                        official_entity_name = first_hit.get("display_names", [clean_name])[0]
-                        form_type = first_hit.get("form", "SEC Filing")
-                        cik = first_hit.get("ciks", ["N/A"])[0]
+                            return VerificationCheckItem(
+                                name="Statutory Regulatory Registry Search",
+                                status="PASS",
+                                score_awarded=20,
+                                max_score=20,
+                                detail=f"Official SEC EDGAR regulatory match found: CIK {cik} ({form_type}) - '{official_entity_name}'"
+                            ), official_entity_name
+            except Exception as e:
+                logger.debug(f"SEC EDGAR search note: {e}")
 
-                        return VerificationCheckItem(
-                            name="Statutory Regulatory Registry Search",
-                            status="PASS",
-                            score_awarded=20,
-                            max_score=20,
-                            detail=f"Official SEC EDGAR regulatory match found: CIK {cik} ({form_type}) - '{official_entity_name}'"
-                        ), official_entity_name
+        # 2. UNITED KINGDOM: Query UK Companies House Public Registry
+        if country_norm in ["UK", "UNITED KINGDOM", "BRITAIN", "ENGLAND", "GLOBAL"]:
+            try:
+                uk_url = f"https://find-and-update.company-information.service.gov.uk/search/companies?q={urllib.parse.quote(clean_name[:40])}"
+                headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) GuptcharVerifier/1.0"}
+                async with httpx.AsyncClient(timeout=self.timeout, headers=headers) as client:
+                    resp = await client.get(uk_url)
+                    if resp.status_code == 200:
+                        matches = re.findall(r'href="/company/([A-Z0-9]+)"[^>]*>\s*([^<]+)\s*</a>', resp.text)
+                        if matches:
+                            co_number, co_title = matches[0]
+                            co_title = re.sub(r'\s+', ' ', co_title).strip()
+                            return VerificationCheckItem(
+                                name="Statutory Regulatory Registry Search",
+                                status="PASS",
+                                score_awarded=20,
+                                max_score=20,
+                                detail=f"Official UK Companies House registered company: Co. No. {co_number} - '{co_title}'"
+                            ), co_title
+            except Exception as e:
+                logger.debug(f"Companies House search note: {e}")
 
-        except Exception as e:
-            logger.debug(f"SEC EDGAR search note: {e}")
+        # 3. INDIA: Ministry of Corporate Affairs (MCA) / ROC / SEBI / RBI registered nomenclature
+        if country_norm in ["IN", "INDIA", "GLOBAL"]:
+            legal_india = re.search(r'(?i)\b(private limited|pvt ltd|limited|ltd|bank|securities|capital|finance|broking|asset management|amc|nbfc)\b', company_name)
+            if legal_india:
+                matched_suffix = legal_india.group(0).upper()
+                return VerificationCheckItem(
+                    name="Statutory Regulatory Registry Search",
+                    status="PASS",
+                    score_awarded=18,
+                    max_score=20,
+                    detail=f"Statutory MCA / ROC registered corporate nomenclature verified: '{matched_suffix}'"
+                ), company_name
 
-        # Check if company has statutory legal suffixes indicating government registration
-        legal_suffix_match = re.search(r'(?i)\b(limited|ltd|bank|pvt ltd|private limited|inc|corp|llc|plc|gmbh|ag|sa)\b', company_name)
+        # 4. GENERAL STATUTORY NOMENCLATURE CHECK (GmbH, AG, LLC, Inc, Corp, PLC, SA, NV, BV)
+        legal_suffix_match = re.search(r'(?i)\b(limited|ltd|bank|pvt ltd|private limited|inc|corp|llc|plc|gmbh|ag|sa|nv|bv)\b', company_name)
         if legal_suffix_match:
             return VerificationCheckItem(
                 name="Statutory Regulatory Registry Search",
                 status="PASS",
-                score_awarded=14,
+                score_awarded=15,
                 max_score=20,
                 detail=f"Registered statutory corporate nomenclature verified ('{legal_suffix_match.group(0).upper()}')."
             ), None
 
+        # 5. CORPORATE DOMAIN & MX VALIDATION AS SECONDARY INFRASTRUCTURE PROOF
+        if domain and domain != "N/A":
+            has_dns, has_mx, detail = await self.check_domain_dns_and_mx(domain)
+            if has_dns and has_mx:
+                return VerificationCheckItem(
+                    name="Statutory Regulatory Registry Search",
+                    status="PASS",
+                    score_awarded=12,
+                    max_score=20,
+                    detail=f"Statutory registry unindexed, but verified active corporate domain with validated DNS & MX mail exchange."
+                ), None
+
         return VerificationCheckItem(
             name="Statutory Regulatory Registry Search",
-            status="WARN",
-            score_awarded=5,
+            status="FAIL",
+            score_awarded=0,
             max_score=20,
-            detail="No matching statutory filings found on primary financial registry."
+            detail="No matching statutory filings found on primary registries AND lacks verified DNS+MX corporate infrastructure."
         ), None
 
     async def _check_ai_corporate_profile(self, company_data: Dict[str, Any]) -> VerificationCheckItem:

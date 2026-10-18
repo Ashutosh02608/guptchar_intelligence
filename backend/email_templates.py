@@ -166,8 +166,7 @@ Unsubscribed organizations do not receive:
 • Instant leadership SMS & WhatsApp alerts for high-severity emergency circulars.
 • Bespoke SEC EDGAR filing verifications and human-reviewed advisory dispatching.
 
-To activate continuous compliance protection for {company.name}, simply reply to this email or visit:
-https://guptchar.local/subscribe?entity={company.id}
+To activate continuous compliance protection for {company.name}, simply reply directly to this email.
 
 Registered Service Address:
 {address}

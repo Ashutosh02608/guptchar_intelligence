@@ -22,6 +22,7 @@ class RegulatoryMonitoringEngine:
         self.total_checks = 0
         self.total_updates_detected = 0
         self._task: Optional[asyncio.Task] = None
+        self._worker_tasks: Dict[str, asyncio.Task] = {}
         self._listeners: Set[Callable[[Dict], Awaitable[None]]] = set()
         self._known_hashes: Set[str] = set()
         self._is_baseline_ready = False
@@ -146,34 +147,93 @@ class RegulatoryMonitoringEngine:
             "stats": stats.dict()
         })
 
-    async def _loop(self):
-        logger.info(f"🛡️ Guptchar 24*7 Surveillance running with {self.cycle_interval_sec}s refresh cadence.")
-        self.is_running = True
-        
-        # Step 1: Establish baseline watermark (so historical items are NOT treated as new alerts)
-        await self.initialize_baseline()
+    async def _board_worker(self, board_id: str):
+        """
+        Independent asynchronous surveillance worker for a single regulatory board.
+        Sweeps strictly on its own cadence and immediately updates health/stats to frontend
+        without waiting for or being delayed by other regulators.
+        """
+        logger.info(f"🛰️ [Worker Active] Dedicated surveillance thread active for [{board_id}]")
+        # Stagger initial boot slightly (200ms) to prevent instantaneous CPU spike
+        await asyncio.sleep(0.2)
 
-        # Step 2: 24*7 monitoring loop
         while self.is_running:
             try:
-                await self.run_monitoring_cycle()
-                
-                # 10-second countdown tick broadcast
-                for second in range(self.cycle_interval_sec):
-                    if not self.is_running:
-                        break
-                    remaining = self.cycle_interval_sec - second
-                    await self.broadcast("TICK", {
-                        "seconds_remaining": remaining,
-                        "uptime": round(time.time() - self.started_at, 1)
+                boards = await get_all_boards()
+                board = next((b for b in boards if b.id == board_id), None)
+                if board and board.enabled:
+                    sweep_start = time.time()
+                    await self.check_single_board(board)
+
+                    # Immediately broadcast updated status and stats so fast boards (SEC, FCA) reflect instantly
+                    updated_boards = await get_all_boards()
+                    stats = await self.get_stats(boards=updated_boards)
+                    await self.broadcast("SWEEP_COMPLETE", {
+                        "boards": [b.dict() for b in updated_boards],
+                        "stats": stats.dict()
                     })
-                    await asyncio.sleep(1.0)
-                    
+
+                    # Calculate precise remaining sleep to maintain exact interval cadence
+                    elapsed = time.time() - sweep_start
+                    poll_interval = board.poll_interval_sec if board.poll_interval_sec > 0 else self.cycle_interval_sec
+                    sleep_duration = max(1.0, poll_interval - elapsed)
+                    await asyncio.sleep(sleep_duration)
+                else:
+                    await asyncio.sleep(5.0)
+
             except asyncio.CancelledError:
                 break
             except Exception as e:
-                logger.error(f"Unexpected error in monitoring cycle: {e}", exc_info=True)
-                await asyncio.sleep(2.0)
+                logger.error(f"Error in dedicated worker [{board_id}]: {e}")
+                await asyncio.sleep(3.0)
+
+        logger.info(f"🛑 [Worker Stopped] Dedicated worker halted for [{board_id}]")
+
+    async def _loop(self):
+        """
+        Master supervisor: manages independent board workers and broadcasts real-time 1-second countdown ticks.
+        """
+        logger.info(f"🛡️ Guptchar 24*7 Independent-Worker Surveillance running with {self.cycle_interval_sec}s baseline.")
+        self.is_running = True
+
+        # Step 1: Establish baseline watermark across existing releases
+        await self.initialize_baseline()
+
+        # Step 2: Spawn initial workers for all enabled boards
+        boards = await get_all_boards()
+        for b in boards:
+            if b.enabled:
+                if b.id not in self._worker_tasks or self._worker_tasks[b.id].done():
+                    self._worker_tasks[b.id] = asyncio.create_task(self._board_worker(b.id))
+
+        # Step 3: Real-time 1-second countdown ticker & worker health supervisor
+        while self.is_running:
+            try:
+                now = time.time()
+                elapsed = int(now - self.started_at)
+                remaining = self.cycle_interval_sec - (elapsed % self.cycle_interval_sec)
+
+                await self.broadcast("TICK", {
+                    "seconds_remaining": remaining,
+                    "uptime": round(now - self.started_at, 1)
+                })
+
+                # Check if any new boards were added to database or if disabled workers should be stopped
+                current_boards = await get_all_boards()
+                for b in current_boards:
+                    if b.enabled:
+                        if b.id not in self._worker_tasks or self._worker_tasks[b.id].done():
+                            self._worker_tasks[b.id] = asyncio.create_task(self._board_worker(b.id))
+                    else:
+                        if b.id in self._worker_tasks and not self._worker_tasks[b.id].done():
+                            self._worker_tasks[b.id].cancel()
+
+                await asyncio.sleep(1.0)
+            except asyncio.CancelledError:
+                break
+            except Exception as e:
+                logger.error(f"Error in master supervisor loop: {e}", exc_info=True)
+                await asyncio.sleep(1.0)
 
     async def start(self):
         if self._task and not self._task.done():
@@ -185,6 +245,10 @@ class RegulatoryMonitoringEngine:
 
     async def stop(self):
         self.is_running = False
+        for task in self._worker_tasks.values():
+            if not task.done():
+                task.cancel()
+        self._worker_tasks.clear()
         if self._task:
             self._task.cancel()
             try:

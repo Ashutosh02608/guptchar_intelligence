@@ -454,7 +454,7 @@ async def update_company_full_profile(company_id: str, payload: UpdateCompanyReq
     """
     Updates full company attributes including country, city, state, pincode, physical address,
     domain, company contact, and leadership (Founder, CEO, MD + phone & email).
-    Persists to SQLite and syncs live to Neon PostgreSQL.
+    Persists directly to Neon PostgreSQL.
     """
     updates_dict = payload.model_dump(exclude_unset=True)
     updated = await update_company_profile(company_id=company_id, updates=updates_dict)

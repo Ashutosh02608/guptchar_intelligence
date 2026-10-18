@@ -10,7 +10,8 @@ import {
   Building, 
   LogOut, 
   PanelLeftClose, 
-  PanelLeftOpen
+  PanelLeftOpen,
+  Calendar
 } from "lucide-react";
 
 export function Sidebar({
@@ -69,6 +70,14 @@ export function Sidebar({
       shortcut: "4",
       badge: outboxCount > 0 ? outboxCount : null,
       badgeColor: "var(--neon-amber)"
+    },
+    { 
+      id: "calendar", 
+      label: "Compliance Calendar", 
+      icon: Calendar, 
+      shortcut: "5",
+      badge: null,
+      badgeColor: "var(--neon-emerald)"
     },
     { 
       id: "companies", 

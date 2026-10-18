@@ -7,11 +7,90 @@ and extracts key compliance obligations without requiring external LLM API keys.
 
 import re
 import time
-from typing import Dict, List, Tuple
+import datetime
+from typing import Dict, List, Tuple, Optional
 from .models import (
     AnnouncementAnalysis, SectorImpact, SectorCategory,
     DirectionalBias, SeverityLevel, ImpactHorizon
 )
+
+MONTHS_MAP = {
+    "jan": 1, "january": 1, "feb": 2, "february": 2, "mar": 3, "march": 3,
+    "apr": 4, "april": 4, "may": 5, "june": 6, "jun": 6, "jul": 7, "july": 7,
+    "aug": 8, "august": 8, "sep": 9, "september": 9, "oct": 10, "october": 10,
+    "nov": 11, "november": 11, "dec": 12, "december": 12
+}
+
+def extract_statutory_deadline(text: str, detected_at: Optional[float] = None, urgency: str = "STANDARD_WINDOW") -> str:
+    """
+    Extracts explicit enforcement deadline from circular text or derives deterministic statutory target date.
+    Returns ISO date string: YYYY-MM-DD.
+    """
+    base_time = detected_at if detected_at else time.time()
+    base_date = datetime.date.fromtimestamp(base_time)
+    text_lower = text.lower()
+
+    # 1. Immediate enforcement phrases
+    if "immediate effect" in text_lower or "effective immediately" in text_lower:
+        return (base_date + datetime.timedelta(days=3)).strftime("%Y-%m-%d")
+
+    # 2. Explicit day windows (e.g., "within 15 days", "within 30 days", "within 45 days", "within 90 days")
+    day_match = re.search(r'\bwithin\s+(\d{1,3})\s+(?:calendar\s+)?days\b', text_lower)
+    if day_match:
+        days = int(day_match.group(1))
+        return (base_date + datetime.timedelta(days=min(365, max(1, days)))).strftime("%Y-%m-%d")
+
+    # 3. Explicit month windows (e.g., "within 2 months", "within 3 months")
+    month_match = re.search(r'\bwithin\s+(\d{1,2})\s+months?\b', text_lower)
+    if month_match:
+        months = int(month_match.group(1))
+        return (base_date + datetime.timedelta(days=months * 30)).strftime("%Y-%m-%d")
+
+    # 4. Explicit ISO date: "2026-11-30"
+    iso_date_match = re.search(r'\b(202[4-9]-(?:0[1-9]|1[0-2])-(?:0[1-9]|[12]\d|3[01]))\b', text)
+    if iso_date_match:
+        return iso_date_match.group(1)
+
+    # 5. Named date: "15th November 2026" or "November 15, 2026"
+    named_date_match = re.search(
+        r'\b(?:effective|effect from|w\.e\.f\.?|by|deadline|before|applicable from)\s+'
+        r'(\d{1,2})(?:st|nd|rd|th)?\s+([A-Za-z]+),?\s+(202[4-9])\b',
+        text,
+        re.IGNORECASE
+    )
+    if named_date_match:
+        d_str, m_str, y_str = named_date_match.groups()
+        m_num = MONTHS_MAP.get(m_str.lower()[:3])
+        if m_num:
+            try:
+                dt = datetime.date(int(y_str), m_num, int(d_str))
+                return dt.strftime("%Y-%m-%d")
+            except ValueError:
+                pass
+
+    rev_date_match = re.search(
+        r'\b(?:effective|effect from|w\.e\.f\.?|by|deadline|before|applicable from)\s+'
+        r'([A-Za-z]+)\s+(\d{1,2})(?:st|nd|rd|th)?,?\s+(202[4-9])\b',
+        text,
+        re.IGNORECASE
+    )
+    if rev_date_match:
+        m_str, d_str, y_str = rev_date_match.groups()
+        m_num = MONTHS_MAP.get(m_str.lower()[:3])
+        if m_num:
+            try:
+                dt = datetime.date(int(y_str), m_num, int(d_str))
+                return dt.strftime("%Y-%m-%d")
+            except ValueError:
+                pass
+
+    # 6. Default statutory window based on urgency
+    if urgency == "CRITICAL_IMMEDIATE":
+        return (base_date + datetime.timedelta(days=7)).strftime("%Y-%m-%d")
+    elif urgency == "STANDARD_WINDOW":
+        return (base_date + datetime.timedelta(days=30)).strftime("%Y-%m-%d")
+    else:
+        return (base_date + datetime.timedelta(days=90)).strftime("%Y-%m-%d")
 
 # Comprehensive keyword ontology for regulatory sector classification
 SECTOR_KEYWORDS: Dict[SectorCategory, Dict[str, any]] = {
@@ -250,7 +329,7 @@ def analyze_with_heuristics(
         executive_summary=exec_summary,
         key_provisions=key_provisions,
         compliance_urgency=urgency,
-        effective_deadline="Refer to official circular text",
+        effective_deadline=extract_statutory_deadline(f"{title} {summary}", urgency=urgency),
         market_sentiment="DEFENSIVE_SCRUTINY" if is_critical_flag else "ADAPTIVE_COMPLIANCE",
         model_provider_used="heuristic-expert-reasoner-v1",
         latency_ms=latency,

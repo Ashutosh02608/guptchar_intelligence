@@ -9,7 +9,7 @@ import uuid
 import time
 import asyncio
 import logging
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any, Optional, Tuple
 
 from .models import RegulatoryUpdate, OutboxDispatch, ImpactedCompany
 from .database import (
@@ -23,6 +23,7 @@ from ai.models import SectorCategory
 from extractor.models import ExtractorQuery
 from extractor.pipeline import ExtractorPipeline
 from .email_templates import generate_email_dispatch
+from .verifier import CompanyVerifier
 
 logger = logging.getLogger("Guptchar.IntelligenceService")
 
@@ -41,7 +42,7 @@ SECTOR_SEARCH_MAP = {
     SectorCategory.CORPORATE_GOVERNANCE: "Corporate Financial Advisory"
 }
 
-# Map Jurisdiction to Primary Hub City & Country
+# Map Jurisdiction to Primary Default Hub City & Country
 JURISDICTION_LOCATION_MAP = {
     "US": ("United States", "New York"),
     "UK": ("United Kingdom", "London"),
@@ -50,10 +51,67 @@ JURISDICTION_LOCATION_MAP = {
     "GLOBAL": ("United States", "New York")
 }
 
+# Dynamic Sector-Aware Financial Hub Routing Map (Item 3)
+SECTOR_JURISDICTION_HUB_MAP = {
+    "IN": {
+        SectorCategory.FINTECH: ("India", "Bengaluru"),
+        SectorCategory.IT_CYBERSECURITY: ("India", "Bengaluru"),
+        SectorCategory.CRYPTO_DIGITAL_ASSETS: ("India", "Bengaluru"),
+        SectorCategory.BANKING: ("India", "Mumbai"),
+        SectorCategory.NBFC: ("India", "Mumbai"),
+        SectorCategory.CAPITAL_MARKETS: ("India", "Mumbai"),
+        SectorCategory.DERIVATIVES_FOREX: ("India", "Mumbai"),
+        SectorCategory.ASSET_MANAGEMENT: ("India", "Mumbai"),
+        SectorCategory.INSURANCE: ("India", "Mumbai"),
+        SectorCategory.REAL_ESTATE: ("India", "Mumbai"),
+        SectorCategory.CORPORATE_GOVERNANCE: ("India", "Mumbai"),
+    },
+    "US": {
+        SectorCategory.FINTECH: ("United States", "San Francisco"),
+        SectorCategory.IT_CYBERSECURITY: ("United States", "San Francisco"),
+        SectorCategory.CRYPTO_DIGITAL_ASSETS: ("United States", "San Francisco"),
+        SectorCategory.DERIVATIVES_FOREX: ("United States", "Chicago"),
+        SectorCategory.BANKING: ("United States", "New York"),
+        SectorCategory.CAPITAL_MARKETS: ("United States", "New York"),
+        SectorCategory.ASSET_MANAGEMENT: ("United States", "New York"),
+        SectorCategory.INSURANCE: ("United States", "New York"),
+        SectorCategory.REAL_ESTATE: ("United States", "New York"),
+        SectorCategory.CORPORATE_GOVERNANCE: ("United States", "New York"),
+        SectorCategory.NBFC: ("United States", "New York"),
+    },
+    "UK": {
+        SectorCategory.FINTECH: ("United Kingdom", "London"),
+        SectorCategory.DERIVATIVES_FOREX: ("United Kingdom", "London"),
+        SectorCategory.CAPITAL_MARKETS: ("United Kingdom", "London"),
+        SectorCategory.BANKING: ("United Kingdom", "London"),
+        SectorCategory.ASSET_MANAGEMENT: ("United Kingdom", "London"),
+    },
+    "EU": {
+        SectorCategory.FINTECH: ("Germany", "Berlin"),
+        SectorCategory.IT_CYBERSECURITY: ("Germany", "Frankfurt"),
+        SectorCategory.BANKING: ("Germany", "Frankfurt"),
+        SectorCategory.DERIVATIVES_FOREX: ("Germany", "Frankfurt"),
+        SectorCategory.ASSET_MANAGEMENT: ("Germany", "Frankfurt"),
+        SectorCategory.CRYPTO_DIGITAL_ASSETS: ("Switzerland", "Zug"),
+    }
+}
+
+def resolve_target_hub(jurisdiction: str, sector: SectorCategory) -> Tuple[str, str]:
+    """
+    Dynamically routes entity discovery to the specific financial/tech operational cluster
+    best matched to the impacted sector and authority jurisdiction.
+    """
+    jur = (jurisdiction or "US").upper().strip()
+    jur_map = SECTOR_JURISDICTION_HUB_MAP.get(jur)
+    if jur_map and sector in jur_map:
+        return jur_map[sector]
+    return JURISDICTION_LOCATION_MAP.get(jur, ("United States", "New York"))
+
 
 class AutonomousIntelligenceService:
     def __init__(self):
         self.analyzer = RegulatorySectorAnalyzer()
+        self.verifier = CompanyVerifier()
         self._ws_broadcaster = None
 
     def register_broadcaster(self, broadcaster_fn):
@@ -88,6 +146,25 @@ class AutonomousIntelligenceService:
             "url": update.url
         })
 
+        # Sync extracted deadline & statutory urgency into update (Item 2)
+        if analysis.effective_deadline:
+            update.effective_deadline = str(analysis.effective_deadline)
+        if analysis.compliance_urgency:
+            update.compliance_urgency = str(getattr(analysis.compliance_urgency, "value", analysis.compliance_urgency))
+
+        try:
+            from .postgres import get_pool
+            pool = await get_pool()
+            async with pool.acquire() as conn:
+                await conn.execute("""
+                    UPDATE updates 
+                    SET effective_deadline = COALESCE($1, effective_deadline),
+                        compliance_urgency = COALESCE($2, compliance_urgency)
+                    WHERE id = $3;
+                """, update.effective_deadline, update.compliance_urgency, update.id)
+        except Exception as e:
+            logger.debug(f"Could not sync deadline to db: {e}")
+
         # Primary Decision: If AI API key is provided and succeeded, AI is authoritative for severity & relevance
         from ai.llm_client import llm_client
         if llm_client.has_ai_api_key() and getattr(analysis, "model_provider_used", "heuristic") != "heuristic":
@@ -114,11 +191,12 @@ class AutonomousIntelligenceService:
         sector_search_term = SECTOR_SEARCH_MAP.get(primary_sector_enum, primary_sector_enum.value)
 
         jurisdiction = update.jurisdiction.upper()
-        country, city = JURISDICTION_LOCATION_MAP.get(jurisdiction, ("United States", "New York"))
+        # Sector-Aware Dynamic Hub Routing (Item 3)
+        country, city = resolve_target_hub(jurisdiction, primary_sector_enum)
 
         logger.info(
-            f"🎯 [Intelligence Service] Target Identified: Sector='{sector_search_term}' "
-            f"| Region='{city}, {country}' | Impact Score={analysis.overall_impact_score}/10"
+            f"🎯 [Intelligence Service] Dynamic Cluster Route: Sector='{sector_search_term}' "
+            f"-> Hub='{city}, {country}' | Impact Score={analysis.overall_impact_score}/10 | Deadline={update.effective_deadline or 'N/A'}"
         )
 
         # -------------------------------------------------------------
@@ -128,8 +206,8 @@ class AutonomousIntelligenceService:
             country=country,
             city=city,
             sector=sector_search_term,
-            limit=20,
-            check_sec=(jurisdiction == "US"),
+            limit=50,
+            check_sec=True,
             export_pdf=False,
             export_json=False
         )
@@ -173,6 +251,33 @@ class AutonomousIntelligenceService:
                 domain_match = re.search(r'https?://(?:www\.)?([^/]+)', entity.website_url)
                 if domain_match:
                     domain = domain_match.group(1).lower()
+
+            # -------------------------------------------------------------
+            # Statutory Corporate Legitimacy Gate (Rule 5)
+            # Require that any entity stored in DB either:
+            # 1. Has an official statutory registry match (SEC EDGAR, UK Companies House, Indian MCA/ROC), OR
+            # 2. Has an active corporate domain with verifiable DNS + MX (Mail Exchange) records.
+            # -------------------------------------------------------------
+            has_sec_filing = bool(entity.sec_filings and any(f.cik != "N/A" for f in entity.sec_filings))
+            reg_check, reg_name = await self.verifier._check_statutory_registry(
+                company_name=entity.name,
+                country=country,
+                domain=domain
+            )
+            has_statutory_match = has_sec_filing or (reg_check.status == "PASS" and reg_check.score_awarded >= 14)
+
+            has_dns, has_mx, _ = await CompanyVerifier.check_domain_dns_and_mx(domain)
+            has_verified_infrastructure = (has_dns and has_mx)
+
+            if not has_statutory_match and not has_verified_infrastructure:
+                logger.info(
+                    f"🚫 [Statutory Gate] Rejected '{entity.name}': Lacks official statutory registry match "
+                    f"and verified DNS+MX mail infrastructure. ({reg_check.detail})"
+                )
+                continue
+
+            if reg_name and entity.data_provenance in ("Website", "N/A"):
+                entity.data_provenance = f"Statutory Registry / Website"
 
             # Execs JSON
             execs_data = [ex.model_dump() for ex in entity.executives] if entity.executives else []

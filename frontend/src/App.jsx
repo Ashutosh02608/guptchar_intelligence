@@ -9,6 +9,7 @@ import { OutboxPage } from "./pages/OutboxPage";
 import { CompaniesPage } from "./pages/CompaniesPage";
 import { TelemetryPage } from "./pages/TelemetryPage";
 import { SettingsPage } from "./pages/SettingsPage";
+import { ComplianceCalendarPage } from "./pages/ComplianceCalendarPage";
 import { AddBoardModal } from "./components/AddBoardModal";
 import { CircularDetailModal } from "./components/CircularDetailModal";
 import { AlertBanner } from "./components/AlertBanner";
@@ -501,6 +502,13 @@ export function App() {
             onDeleteDispatch={handleDeleteDispatch}
             onClearOutbox={handleClearOutbox}
             onRefresh={fetchData}
+          />
+        )}
+
+        {activeTab === "calendar" && (
+          <ComplianceCalendarPage
+            updates={updates}
+            onSelectUpdate={(item) => setSelectedItem(item)}
           />
         )}
 

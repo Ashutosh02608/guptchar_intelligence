@@ -116,8 +116,13 @@ async def init_db():
                 published_date TEXT,
                 content_hash TEXT NOT NULL,
                 is_read BOOLEAN NOT NULL DEFAULT FALSE,
-                pinned BOOLEAN NOT NULL DEFAULT FALSE
+                pinned BOOLEAN NOT NULL DEFAULT FALSE,
+                effective_deadline TEXT,
+                compliance_urgency VARCHAR(64)
             );
+
+            ALTER TABLE updates ADD COLUMN IF NOT EXISTS effective_deadline TEXT;
+            ALTER TABLE updates ADD COLUMN IF NOT EXISTS compliance_urgency VARCHAR(64);
 
             CREATE TABLE IF NOT EXISTS known_hashes (
                 content_hash VARCHAR(255) PRIMARY KEY,
@@ -232,7 +237,23 @@ async def init_db():
                 created_at DOUBLE PRECISION NOT NULL
             );
 
+            -- AI Regulatory Intelligence & Sector Impact Deduplication Cache
+            CREATE TABLE IF NOT EXISTS announcement_analyses (
+                announcement_id VARCHAR(128) PRIMARY KEY,
+                title TEXT NOT NULL,
+                authority VARCHAR(255) NOT NULL,
+                jurisdiction VARCHAR(64) NOT NULL,
+                primary_sector VARCHAR(128) NOT NULL,
+                overall_impact_score DOUBLE PRECISION NOT NULL,
+                compliance_urgency VARCHAR(64) NOT NULL,
+                model_provider_used VARCHAR(128) NOT NULL,
+                analyzed_at DOUBLE PRECISION NOT NULL,
+                payload_json TEXT NOT NULL
+            );
+
             -- Indexes for fast querying
+            CREATE INDEX IF NOT EXISTS idx_announcement_analyses_sector ON announcement_analyses (primary_sector);
+            CREATE INDEX IF NOT EXISTS idx_announcement_analyses_time ON announcement_analyses (analyzed_at DESC);
             CREATE INDEX IF NOT EXISTS idx_users_username_lower ON users (LOWER(username));
             CREATE INDEX IF NOT EXISTS idx_users_email_lower ON users (LOWER(email));
             CREATE INDEX IF NOT EXISTS idx_updates_detected ON updates (detected_at DESC);
@@ -476,12 +497,16 @@ async def save_update(update: RegulatoryUpdate) -> bool:
         await conn.execute("""
             INSERT INTO updates (
                 id, board_id, board_name, jurisdiction, title, url, summary,
-                category, severity, detected_at, published_date, content_hash, is_read, pinned
-            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
-            ON CONFLICT (id) DO NOTHING;
+                category, severity, detected_at, published_date, content_hash, is_read, pinned,
+                effective_deadline, compliance_urgency
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
+            ON CONFLICT (id) DO UPDATE SET
+                effective_deadline = COALESCE(EXCLUDED.effective_deadline, updates.effective_deadline),
+                compliance_urgency = COALESCE(EXCLUDED.compliance_urgency, updates.compliance_urgency);
         """, update.id, update.board_id, update.board_name, update.jurisdiction, update.title,
              update.url, update.summary, update.category, update.severity, update.detected_at,
-             update.published_date, update.content_hash, update.is_read, update.pinned)
+             update.published_date, update.content_hash, update.is_read, update.pinned,
+             update.effective_deadline, update.compliance_urgency)
         return True
 
 
@@ -521,7 +546,9 @@ async def get_updates(limit: int = 100, board_id: Optional[str] = None, severity
                 published_date=d["published_date"],
                 content_hash=d["content_hash"],
                 is_read=bool(d["is_read"]),
-                pinned=bool(d["pinned"])
+                pinned=bool(d["pinned"]),
+                effective_deadline=d.get("effective_deadline"),
+                compliance_urgency=d.get("compliance_urgency")
             ))
         return updates
 

@@ -26,6 +26,7 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] [AI]
 class LLMClient:
     def __init__(self):
         self.timeout = config.TIMEOUT_SECONDS
+        self._gemini_cooldown_until: float = 0.0
 
     def has_ai_api_key(self) -> bool:
         """Returns True if any supported LLM provider API key is validly configured."""
@@ -138,11 +139,32 @@ class LLMClient:
         model_name_used = active_provider
 
         if active_provider == "gemini" and config.is_valid_key(config.GEMINI_API_KEY):
-            try:
-                parsed_json = await self._call_gemini(user_prompt)
-                model_name_used = f"gemini/{config.GEMINI_MODEL}"
-            except Exception as e:
-                logger.warning(f"⚠️ [AI Key Error / Quota Exceeded] Gemini API call failed ({e}). Automatically transitioning to default Heuristic Reasoner.")
+            is_cooling_down = time.time() < self._gemini_cooldown_until
+            if is_cooling_down:
+                remaining_sec = max(1, int(self._gemini_cooldown_until - time.time()))
+                logger.info(
+                    f"⏳ [Quota Circuit Breaker Active] Gemini 1.5 Flash cooling down ({remaining_sec}s remaining). "
+                    f"Routing '{title[:45]}...' instantly to Heuristic Reasoner (0ms network delay)."
+                )
+                model_name_used = "heuristic-engine (fallback: gemini quota cooldown)"
+            else:
+                try:
+                    parsed_json = await self._call_gemini(user_prompt)
+                    model_name_used = f"gemini/{config.GEMINI_MODEL}"
+                    self._gemini_cooldown_until = 0.0  # Reset cooldown on successful response
+                except httpx.HTTPStatusError as e:
+                    if e.response.status_code == 429:
+                        self._gemini_cooldown_until = time.time() + 60.0
+                        logger.warning(
+                            "⚠️ [Gemini 1.5 Flash Quota Exceeded (429)] Free tier limit (15 RPM / 1,500 RPD) reached! "
+                            "Activating 60s Quota Circuit Breaker. Seamlessly transitioning to Heuristic Engine."
+                        )
+                    else:
+                        logger.warning(f"⚠️ [Gemini HTTP Error {e.response.status_code}] ({e}). Transitioning to Heuristic Reasoner.")
+                    model_name_used = "heuristic-engine (fallback: gemini quota exceeded)"
+                except Exception as e:
+                    logger.warning(f"⚠️ [Gemini API Error] ({e}). Automatically transitioning to default Heuristic Reasoner.")
+                    model_name_used = "heuristic-engine (fallback: gemini error)"
 
         elif active_provider == "openai" and config.is_valid_key(config.OPENAI_API_KEY):
             try:
@@ -150,6 +172,7 @@ class LLMClient:
                 model_name_used = f"openai/{config.OPENAI_MODEL}"
             except Exception as e:
                 logger.warning(f"⚠️ [AI Key Error / Quota Exceeded] OpenAI API call failed ({e}). Automatically transitioning to default Heuristic Reasoner.")
+                model_name_used = "heuristic-engine (fallback: openai error)"
 
         elif active_provider == "anthropic" and config.is_valid_key(config.ANTHROPIC_API_KEY):
             try:
@@ -157,6 +180,7 @@ class LLMClient:
                 model_name_used = f"anthropic/{config.ANTHROPIC_MODEL}"
             except Exception as e:
                 logger.warning(f"⚠️ [AI Key Error / Quota Exceeded] Anthropic API call failed ({e}). Automatically transitioning to default Heuristic Reasoner.")
+                model_name_used = "heuristic-engine (fallback: anthropic error)"
 
         elif active_provider == "ollama":
             try:
@@ -164,6 +188,7 @@ class LLMClient:
                 model_name_used = f"ollama/{config.OLLAMA_MODEL}"
             except Exception as e:
                 logger.warning(f"⚠️ [Local AI Notice] Ollama connection failed ({e}). Automatically transitioning to default Heuristic Reasoner.")
+                model_name_used = "heuristic-engine (fallback: ollama error)"
 
         # If LLM succeeded and produced valid JSON, parse into AnnouncementAnalysis
         if parsed_json:
@@ -177,7 +202,7 @@ class LLMClient:
                 logger.warning(f"Failed to parse LLM JSON output ({e}). Falling back to Heuristic Reasoner.")
 
         # Fallback to Heuristic Rule Engine
-        return analyze_with_heuristics(
+        heuristic_res = analyze_with_heuristics(
             announcement_id=announcement_id,
             title=title,
             authority=authority,
@@ -185,6 +210,9 @@ class LLMClient:
             summary=summary,
             url=url
         )
+        if model_name_used and ("fallback" in model_name_used or "gemini" in model_name_used):
+            heuristic_res.model_provider_used = model_name_used
+        return heuristic_res
 
     async def _call_gemini(self, prompt: str) -> Dict[str, Any]:
         """Calls Google Gemini REST API using generateContent with system instruction."""

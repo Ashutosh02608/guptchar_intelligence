@@ -81,11 +81,11 @@ def get_shared_scraper_client() -> httpx.AsyncClient:
     global _shared_scraper_client
     if _shared_scraper_client is None or _shared_scraper_client.is_closed:
         _shared_scraper_client = httpx.AsyncClient(
-            timeout=8.0,
+            timeout=httpx.Timeout(connect=2.5, read=4.5, write=2.0, pool=2.0),
             follow_redirects=True,
             headers=HEADERS,
             verify=False,
-            limits=httpx.Limits(max_keepalive_connections=20, max_connections=40, keepalive_expiry=60.0)
+            limits=httpx.Limits(max_keepalive_connections=30, max_connections=50, keepalive_expiry=90.0)
         )
     return _shared_scraper_client
 
@@ -113,7 +113,8 @@ async def fetch_board_feed(board: RegulatoryBoard) -> Tuple[str, float, List[Reg
         
         # If RSS / XML feed
         if "<rss" in content.lower() or "<feed" in content.lower() or "<?xml" in content.lower():
-            feed = feedparser.parse(content)
+            # Offload synchronous feedparser XML parsing to worker thread
+            feed = await asyncio.to_thread(feedparser.parse, content)
             # Read the top items
             for entry in feed.entries[:12]:
                 title = getattr(entry, "title", "").strip()

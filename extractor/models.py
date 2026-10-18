@@ -90,7 +90,7 @@ class ExtractorQuery(BaseModel):
     country: str = Field(..., description="Target Country (e.g. United States, United Kingdom, India)")
     city: str = Field(..., description="Target City (e.g. New York, London, Mumbai)")
     sector: str = Field(..., description="Target Sector/Keyword (e.g. Hedge Funds, Private Equity, FinTech)")
-    limit: int = Field(default=20, ge=1, le=100, description="Max entities to discover and enrich")
+    limit: int = Field(default=50, ge=1, le=100, description="Max entities to discover and enrich")
     check_sec: bool = Field(default=True, description="Enable automatic SEC EDGAR regulatory filings lookup")
     export_pdf: bool = Field(default=True, description="Generate executive PDF dossier")
     export_json: bool = Field(default=True, description="Generate strict JSON export")

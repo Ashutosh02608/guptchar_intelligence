@@ -57,6 +57,8 @@ class AIConfig:
         k = key.strip()
         if len(k) < 8:
             return False
+        if k.startswith("AQ."):
+            return False
         lower = k.lower()
         if any(dummy in lower for dummy in ["your_", "_here", "placeholder", "xxxx", "test_key"]):
             return False

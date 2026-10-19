@@ -2,6 +2,7 @@
 FastAPI REST API & Presentation Server for Extractor Engine
 """
 
+import asyncio
 from pathlib import Path
 from typing import List
 from fastapi import FastAPI, HTTPException, BackgroundTasks
@@ -38,7 +39,7 @@ async def run_extraction(query: ExtractorQuery):
     """
     try:
         pipeline = ExtractorPipeline()
-        result = pipeline.run(query)
+        result = await asyncio.to_thread(pipeline.run, query)
         return result
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Extraction pipeline failed: {str(e)}")

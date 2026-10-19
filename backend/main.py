@@ -576,11 +576,11 @@ async def evaluate_announcement_manually(update_id: str):
 async def run_extraction_api(query: ExtractorQuery):
     """
     Executes Stage A (Discovery) -> Stage B (Deep Web) -> Stage C (SEC EDGAR) -> Exporters.
-    Runs in-memory on the unified backend.
+    Runs in worker thread on the unified backend to keep event loop responsive.
     """
     try:
         pipeline = ExtractorPipeline()
-        result = pipeline.run(query)
+        result = await asyncio.to_thread(pipeline.run, query)
         return result
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Extraction pipeline failed: {str(e)}")

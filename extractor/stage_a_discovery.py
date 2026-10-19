@@ -104,6 +104,8 @@ class GoogleMapsScraper:
 
         # Let Selenium Manager handle driver resolution automatically
         self.driver = webdriver.Chrome(options=options)
+        self.driver.set_page_load_timeout(20)
+        self.driver.set_script_timeout(15)
         
         # Apply Chrome DevTools Protocol (CDP) stealth flag masking
         try:
@@ -283,57 +285,91 @@ class FallbackDiscoveryGenerator:
         entities: List[EnrichedEntity] = []
 
         # Attempt 1: Query OpenStreetMap Nominatim for real commercial nodes with extratags
-        try:
-            headers = {"User-Agent": "GuptcharResearchBot/1.0 (contact@guptchar.internal)"}
-            osm_query = f"{sector} {city} {country}"
-            url = f"https://nominatim.openstreetmap.org/search?q={urllib.parse.quote_plus(osm_query)}&format=json&addressdetails=1&extratags=1&limit={limit}"
-            
-            with httpx.Client(timeout=8.0, headers=headers) as client:
-                resp = client.get(url)
-                if resp.status_code == 200:
-                    data = resp.json()
-                    for item in data:
-                        raw_name = item.get("display_name", "").split(",")[0].strip()
-                        display_name = item.get("display_name", f"{city}, {country}")
+        headers = {"User-Agent": "GuptcharResearchBot/1.0 (contact@guptchar.internal)"}
 
-                        # Quality Gate: Exclude non-corporate landmarks, transit, ATMs, and apartments
-                        if not is_legit_corporate_entity(raw_name, city, country):
-                            continue
+        # Derive search queries (full phrase + simplified keyword fallback)
+        queries = [f"{sector} {city} {country}"]
+        sector_lower = sector.lower()
+        keyword_fallbacks = [
+            ("bank", ["bank", "banking"]),
+            ("finance", ["finance", "financial"]),
+            ("investment", ["hedge fund", "private equity", "asset management", "invest"]),
+            ("stock broker", ["capital markets", "securities", "broker"]),
+            ("insurance", ["insurance", "reinsurance"]),
+            ("fintech", ["fintech", "payments"]),
+            ("crypto", ["crypto", "digital assets", "web3"]),
+            ("real estate", ["real estate", "reit"]),
+            ("technology", ["cybersecurity", "cloud", "it "]),
+            ("consulting", ["corporate", "governance", "advisory"])
+        ]
+        for kw, patterns in keyword_fallbacks:
+            if any(p in sector_lower for p in patterns):
+                queries.append(f"{kw} {city} {country}")
+                break
 
-                        if raw_name.lower() in [e.name.lower() for e in entities]:
-                            continue
+        for query_candidate in queries:
+            if len(entities) >= limit:
+                break
+            try:
+                url = f"https://nominatim.openstreetmap.org/search?q={urllib.parse.quote_plus(query_candidate)}&format=json&addressdetails=1&extratags=1&limit={limit}"
+                with httpx.Client(timeout=6.0, headers=headers) as client:
+                    resp = client.get(url)
+                    if resp.status_code == 200:
+                        data = resp.json()
+                        for item in data:
+                            raw_name = item.get("display_name", "").split(",")[0].strip()
+                            display_name = item.get("display_name", f"{city}, {country}")
 
-                        # Extract authentic website from OSM extratags (Disallow synthetic URL guessing)
-                        extratags = item.get("extratags") or {}
-                        authentic_site = (
-                            extratags.get("website") or
-                            extratags.get("contact:website") or
-                            extratags.get("url") or
-                            "N/A"
-                        ).strip()
+                            # Quality Gate: Exclude non-corporate landmarks, transit, ATMs, and apartments
+                            if not is_legit_corporate_entity(raw_name, city, country):
+                                continue
 
-                        if authentic_site and authentic_site != "N/A":
-                            if not authentic_site.startswith("http://") and not authentic_site.startswith("https://"):
-                                authentic_site = f"https://{authentic_site}"
-                        else:
-                            authentic_site = "N/A"
+                            if raw_name.lower() in [e.name.lower() for e in entities]:
+                                continue
 
-                        entities.append(EnrichedEntity(
-                            name=raw_name,
-                            sector=sector,
-                            country=country,
-                            city=city,
-                            physical_address=display_name,
-                            website_url=authentic_site,
-                            gatekeeper_phone="N/A",
-                            data_provenance="OpenStreetMap / Registry"
-                        ))
-                        if len(entities) >= limit:
-                            break
-        except Exception as e:
-            logger.debug(f"OSM lookup notice: {e}")
+                            extratags = item.get("extratags") or {}
+                            authentic_site = (
+                                extratags.get("website") or
+                                extratags.get("contact:website") or
+                                extratags.get("url") or
+                                "N/A"
+                            ).strip()
 
-        # Strictly return authentic discovered entities without fabricating mock institutions
+                            if authentic_site and authentic_site != "N/A":
+                                if not authentic_site.startswith("http://") and not authentic_site.startswith("https://"):
+                                    authentic_site = f"https://{authentic_site}"
+                            else:
+                                authentic_site = "N/A"
+
+                            authentic_phone = (
+                                extratags.get("phone") or
+                                extratags.get("contact:phone") or
+                                "N/A"
+                            ).strip()
+
+                            authentic_email = (
+                                extratags.get("email") or
+                                extratags.get("contact:email") or
+                                "N/A"
+                            ).strip()
+
+                            entities.append(EnrichedEntity(
+                                name=raw_name,
+                                sector=sector,
+                                country=country,
+                                city=city,
+                                physical_address=display_name,
+                                website_url=authentic_site,
+                                gatekeeper_phone=authentic_phone,
+                                primary_email=authentic_email,
+                                data_provenance="OpenStreetMap / Registry"
+                            ))
+                            if len(entities) >= limit:
+                                break
+            except Exception as e:
+                logger.debug(f"OSM lookup notice for '{query_candidate}': {e}")
+
+        # Strictly return authentic discovered entities
         return entities[:limit]
 
 

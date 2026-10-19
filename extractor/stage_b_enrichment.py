@@ -78,7 +78,7 @@ class AntiBotWebClient:
                 logger.debug(f"cloudscraper init notice: {e}")
         return self._cloud_scraper
 
-    def fetch_page(self, url: str, timeout: float = 8.0) -> Optional[str]:
+    def fetch_page(self, url: str, timeout: float = 4.0) -> Optional[str]:
         """Fetch URL with curl_cffi TLS impersonation, falling back to cloudscraper."""
         if not url or url == "N/A" or not url.startswith("http"):
             return None
@@ -97,7 +97,7 @@ class AntiBotWebClient:
         scraper = self._get_cloud_scraper()
         if scraper:
             try:
-                resp = scraper.get(url, timeout=timeout, allow_redirects=True)
+                resp = scraper.get(url, timeout=min(timeout, 3.5), allow_redirects=True)
                 if resp.status_code == 200 and resp.text:
                     return resp.text
             except Exception as e:
@@ -106,7 +106,7 @@ class AntiBotWebClient:
         # 3. Tertiary: Standard fallback with httpx
         try:
             import httpx
-            with httpx.Client(timeout=timeout, verify=False, follow_redirects=True, headers={"User-Agent": DEFAULT_USER_AGENT}) as client:
+            with httpx.Client(timeout=min(timeout, 3.0), verify=False, follow_redirects=True, headers={"User-Agent": DEFAULT_USER_AGENT}) as client:
                 resp = client.get(url)
                 if resp.status_code == 200:
                     return resp.text
@@ -260,6 +260,9 @@ class WebsiteEnricher:
                 continue
             if len(name_part) < 2 or len(dom_part) < 4:
                 continue
+            # Ensure domain ends with an authentic alphabetic TLD (e.g. .com, .in, .co.uk), not numeric package versions
+            if not re.search(r'\.[a-zA-Z]{2,}$', dom_part):
+                continue
             clean_emails.add(email)
 
         return clean_emails
@@ -366,17 +369,38 @@ class WebsiteEnricher:
             entity.gatekeeper_phone = "N/A"
 
 
-def run_stage_b(entities: List[EnrichedEntity]) -> List[EnrichedEntity]:
-    """Batch executes Stage B Deep Website Enrichment across discovered entities."""
-    enricher = WebsiteEnricher()
-    enriched: List[EnrichedEntity] = []
-    for idx, ent in enumerate(entities, 1):
-        logger.info(f"Stage B: Enriching entity {idx}/{len(entities)}: {ent.name}")
+def run_stage_b(entities: List[EnrichedEntity], max_workers: int = 5) -> List[EnrichedEntity]:
+    """Concurrent batch execution of Stage B Deep Website Enrichment across discovered entities."""
+    if not entities:
+        return []
+
+    from concurrent.futures import ThreadPoolExecutor, as_completed
+
+    def _enrich_single(ent: EnrichedEntity) -> EnrichedEntity:
+        enricher = WebsiteEnricher()
         try:
-            res = enricher.enrich(ent)
-            enriched.append(res)
+            return enricher.enrich(ent)
         except Exception as e:
             logger.error(f"Error enriching {ent.name}: {e}")
             enricher._apply_synthetic_enrichment(ent)
-            enriched.append(ent)
-    return enriched
+            return ent
+
+    enriched_map: Dict[int, EnrichedEntity] = {}
+    workers = min(max_workers, len(entities), 6)
+
+    logger.info(f"Stage B: Concurrently enriching {len(entities)} candidates using {workers} worker threads...")
+    with ThreadPoolExecutor(max_workers=workers) as executor:
+        future_to_idx = {executor.submit(_enrich_single, ent): idx for idx, ent in enumerate(entities)}
+        for future in as_completed(future_to_idx):
+            idx = future_to_idx[future]
+            try:
+                res = future.result()
+                enriched_map[idx] = res
+            except Exception as e:
+                logger.error(f"Worker execution failed for entity {idx}: {e}")
+                ent = entities[idx]
+                WebsiteEnricher()._apply_synthetic_enrichment(ent)
+                enriched_map[idx] = ent
+
+    # Preserve original rank ordering
+    return [enriched_map[i] for i in range(len(entities)) if i in enriched_map]

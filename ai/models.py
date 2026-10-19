@@ -84,3 +84,11 @@ class AnnouncementAnalysis(BaseModel):
     latency_ms: Optional[float] = None
     confidence_score: float = Field(default=0.85, ge=0.0, le=1.0)
     raw_response: Optional[Dict[str, Any]] = None
+
+    @property
+    def overall_severity(self) -> Optional[SeverityLevel]:
+        """Convenience property to access primary severity level of the evaluated announcement."""
+        if self.impacted_sectors:
+            return self.impacted_sectors[0].severity
+        return None
+

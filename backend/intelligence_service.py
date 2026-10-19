@@ -167,16 +167,18 @@ class AutonomousIntelligenceService:
 
         # Primary Decision: If AI API key is provided and succeeded, AI is authoritative for severity & relevance
         from ai.llm_client import llm_client
-        if llm_client.has_ai_api_key() and getattr(analysis, "model_provider_used", "heuristic") != "heuristic":
-            if analysis.overall_severity and update.severity != analysis.overall_severity.value:
-                ai_sev = analysis.overall_severity.value
-                logger.info(f"🤖 [AI Decision] Authoritative AI evaluated severity as '{ai_sev}' (overriding heuristic '{update.severity}').")
-                update.severity = ai_sev
+        model_used = getattr(analysis, "model_provider_used", "heuristic")
+        if llm_client.has_ai_api_key() and not str(model_used).lower().startswith("heuristic"):
+            ai_sev = getattr(analysis, "overall_severity", None)
+            if ai_sev and update.severity != ai_sev.value:
+                ai_sev_val = ai_sev.value
+                logger.info(f"🤖 [AI Decision] Authoritative AI evaluated severity as '{ai_sev_val}' (overriding heuristic '{update.severity}').")
+                update.severity = ai_sev_val
                 try:
                     from .postgres import get_pool
                     pool = await get_pool()
                     async with pool.acquire() as conn:
-                        await conn.execute("UPDATE updates SET severity = $1 WHERE id = $2;", ai_sev, update.id)
+                        await conn.execute("UPDATE updates SET severity = $1 WHERE id = $2;", ai_sev_val, update.id)
                 except Exception as e:
                     logger.debug(f"Could not sync AI severity to db: {e}")
 
@@ -206,7 +208,7 @@ class AutonomousIntelligenceService:
             country=country,
             city=city,
             sector=sector_search_term,
-            limit=50,
+            limit=15,
             check_sec=True,
             export_pdf=False,
             export_json=False
